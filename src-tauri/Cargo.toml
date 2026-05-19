@@ -1,12 +1,12 @@
 [package]
-name = "xquisito-crew"
+name = "even-crew"
 version = "1.0.0"
-description = "Xquisito Crew — Kitchen Display System"
-authors = ["Xquisito"]
+description = "Even Crew — Kitchen Display System"
+authors = ["Even"]
 edition = "2021"
 
 [lib]
-name = "xquisito_crew_lib"
+name = "even_crew_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

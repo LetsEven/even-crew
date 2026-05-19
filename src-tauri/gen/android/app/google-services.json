@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "446721623777",
-    "project_id": "xquisito-crew",
-    "storage_bucket": "xquisito-crew.firebasestorage.app"
+    "project_number": "605872536685",
+    "project_id": "even-crew",
+    "storage_bucket": "even-crew.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:446721623777:android:c802d76dcdcee532f1d9a0",
+        "mobilesdk_app_id": "1:605872536685:android:1605022d0ff0b6cdcbd364",
         "android_client_info": {
-          "package_name": "com.xquisito.crew"
+          "package_name": "com.even.crew"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyA9SeqFVw7FXL-mHFWJKUdGcF8LtGG_CL8"
+          "current_key": "AIzaSyACnKmpUhqxtlRG82U98K65v2UxMl5nF0w"
         }
       ],
       "services": {

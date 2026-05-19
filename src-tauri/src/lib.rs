@@ -33,7 +33,7 @@ $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateCont
 $template.SelectSingleNode('//text[@id=1]').InnerText = $app
 $template.SelectSingleNode('//text[@id=2]').InnerText = $msg
 $toast = [Windows.UI.Notifications.ToastNotification]::new($template)
-[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Xquisito Crew').Show($toast)
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Even Crew').Show($toast)
 "#,
             title = title.replace('\'', ""),
             body = body.replace('\'', "")
@@ -183,7 +183,7 @@ fn build_test_ticket(ip: &str, port: u16, fecha: &str) -> Vec<u8> {
     buf.extend_from_slice(&[0x1b, 0x21, 0x30]);
     buf.extend_from_slice(b"\n== CUENTA NUEVA ==\n");
     buf.extend_from_slice(&[0x1b, 0x21, 0x10]);
-    buf.extend_from_slice(format!("\nXQUISITO PRINT\n").as_bytes());
+    buf.extend_from_slice(format!("\nEVEN PRINT\n").as_bytes());
     buf.extend_from_slice(format!("{}\n", fecha).as_bytes());
     buf.extend_from_slice(b"========================\n");
     buf.extend_from_slice(format!("IP: {}\n", ip).as_bytes());
@@ -312,7 +312,7 @@ fn usb_printer_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
             #[cfg(target_os = "android")]
             {
                 let handle =
-                    api.register_android_plugin("com.xquisito.crew", "UsbPrinterPlugin")?;
+                    api.register_android_plugin("com.even.crew", "UsbPrinterPlugin")?;
                 app.manage(UsbPluginState {
                     handle: Mutex::new(Some(handle)),
                 });
@@ -466,7 +466,7 @@ fn build_test_ticket_usb(printer_name: &str, fecha: &str) -> Vec<u8> {
     buf.extend_from_slice(&[0x1b, 0x21, 0x30]);
     buf.extend_from_slice(b"\n== CUENTA NUEVA ==\n");
     buf.extend_from_slice(&[0x1b, 0x21, 0x10]);
-    buf.extend_from_slice(b"\nXQUISITO PRINT USB\n");
+    buf.extend_from_slice(b"\nEVEN PRINT USB\n");
     buf.extend_from_slice(format!("{}\n", fecha).as_bytes());
     buf.extend_from_slice(b"========================\n");
     buf.extend_from_slice(format!("Impresora: {}\n", printer_name).as_bytes());
@@ -488,8 +488,8 @@ fn get_fcm_token(app: tauri::AppHandle) -> Option<String> {
     {
         use tauri::Manager;
         let candidates = [
-            "/data/data/com.xquisito.crew/files/fcm_token.txt".to_string(),
-            "/data/user/0/com.xquisito.crew/files/fcm_token.txt".to_string(),
+            "/data/data/com.even.crew/files/fcm_token.txt".to_string(),
+            "/data/user/0/com.even.crew/files/fcm_token.txt".to_string(),
         ];
         for path in &candidates {
             if let Ok(token) = std::fs::read_to_string(path) {
@@ -525,7 +525,7 @@ fn get_fcm_token(app: tauri::AppHandle) -> Option<String> {
 fn register_app_user_model_id() {
     use windows::core::HSTRING;
     use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
-    let _ = unsafe { SetCurrentProcessExplicitAppUserModelID(&HSTRING::from("com.xquisito.crew")) };
+    let _ = unsafe { SetCurrentProcessExplicitAppUserModelID(&HSTRING::from("com.even.crew")) };
 }
 
 // ============================================================
@@ -576,7 +576,7 @@ pub fn run() {
 
                 let mut tray_builder = TrayIconBuilder::new()
                     .menu(&menu)
-                    .tooltip("Xquisito Crew");
+                    .tooltip("Even Crew");
 
                 if let Some(icon) = app.default_window_icon() {
                     tray_builder = tray_builder.icon(icon.clone());

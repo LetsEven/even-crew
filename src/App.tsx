@@ -30,8 +30,9 @@ async function showWindowIfNeeded() {
 // Inicializar permisos de notificación al arrancar (no en cada orden)
 async function initNotifications() {
   try {
-    const { isPermissionGranted, requestPermission } =
-      await import("@tauri-apps/plugin-notification");
+    const { isPermissionGranted, requestPermission } = await import(
+      "@tauri-apps/plugin-notification"
+    );
     const granted = await isPermissionGranted();
     if (!granted) await requestPermission();
     console.log("[CREW:NOTIF] Permisos inicializados");
@@ -52,7 +53,9 @@ async function sendDesktopNotification(title: string, body: string) {
   } catch (e) {
     console.warn("[CREW:NOTIF] Rust falló, intentando plugin Tauri:", e);
     try {
-      const { sendNotification } = await import("@tauri-apps/plugin-notification");
+      const { sendNotification } = await import(
+        "@tauri-apps/plugin-notification"
+      );
       await sendNotification({ title, body });
     } catch (e2) {
       console.warn("[CREW:NOTIF] Plugin falló, intentando Web API:", e2);
@@ -67,8 +70,8 @@ export default function App() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { signIn, setActive } = useSignIn();
   const [page, setPage] = useState<Page>("kitchen");
-  const [branchId, setBranchId] = useState<string | null>(
-    () => localStorage.getItem("crew_branch_id"),
+  const [branchId, setBranchId] = useState<string | null>(() =>
+    localStorage.getItem("crew_branch_id"),
   );
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
@@ -116,7 +119,8 @@ export default function App() {
         if (!token) return;
         const list = await getBranches(token);
         setBranches(list);
-      } catch {} finally {
+      } catch {
+      } finally {
         setBranchesLoading(false);
       }
     })();
@@ -166,12 +170,14 @@ export default function App() {
     [updateDishFromSocket],
   );
   const handleRefetch = useCallback(() => {
-    console.log("[CREW:ORDER] 🔔 Nueva orden recibida — ejecutando refetch + notificación");
+    console.log(
+      "[CREW:ORDER] 🔔 Nueva orden recibida — ejecutando refetch + notificación",
+    );
     fetchOrders();
     setNewOrderAlert(true);
     if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
     alertTimerRef.current = setTimeout(() => setNewOrderAlert(false), 3500);
-    sendDesktopNotification("Xquisito Crew", "Nueva orden recibida");
+    sendDesktopNotification("Even Crew", "Nueva orden recibida");
     showWindowIfNeeded();
   }, [fetchOrders]);
 
@@ -241,10 +247,10 @@ export default function App() {
           <div className="mb-8 flex flex-col items-center gap-3">
             <img
               src="/logo-short-green.webp"
-              alt="Xquisito"
+              alt="Even"
               className="w-16 h-16"
             />
-            <h1 className="text-white text-2xl font-semibold">Xquisito Crew</h1>
+            <h1 className="text-white text-2xl font-semibold">Even Crew</h1>
             <p className="text-white/50 text-sm">
               Inicia sesión para continuar
             </p>

@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    xquisito_crew_lib::run();
+    even_crew_lib::run();
 }

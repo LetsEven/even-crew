@@ -5609,7 +5609,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "xquisito-crew"
+name = "even-crew"
 version = "1.0.0"
 dependencies = [
  "local-ip-address",

@@ -1,4 +1,4 @@
-package com.xquisito.crew
+package com.even.crew
 
 import android.app.admin.DeviceAdminReceiver
 import android.content.Context

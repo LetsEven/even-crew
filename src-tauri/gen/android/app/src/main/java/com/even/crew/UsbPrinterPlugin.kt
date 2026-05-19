@@ -1,4 +1,4 @@
-package com.xquisito.crew
+package com.even.crew
 
 import android.app.Activity
 import android.app.PendingIntent
@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val STAR_PREFIX = "star:"
-private const val ACTION_USB_PERMISSION = "com.xquisito.crew.USB_PERMISSION"
+private const val ACTION_USB_PERMISSION = "com.even.crew.USB_PERMISSION"
 
 @InvokeArg
 class PrintRawArgs {
@@ -233,7 +233,7 @@ class UsbPrinterPlugin(private val activity: Activity) : Plugin(activity) {
         buf += listOf(0x1B, 0x21, 0x30).map { it.toByte() }
         buf += "\n== CUENTA NUEVA ==\n".toByteArray(Charsets.US_ASCII).toList()
         buf += listOf(0x1B, 0x21, 0x10).map { it.toByte() }
-        buf += "\nXQUISITO PRINT USB\n".toByteArray(Charsets.US_ASCII).toList()
+        buf += "\nEVEN PRINT USB\n".toByteArray(Charsets.US_ASCII).toList()
         buf += "$ts\n".toByteArray(Charsets.US_ASCII).toList()
         buf += "========================\n".toByteArray(Charsets.US_ASCII).toList()
         buf += "Asigna nombre y rol\n".toByteArray(Charsets.US_ASCII).toList()

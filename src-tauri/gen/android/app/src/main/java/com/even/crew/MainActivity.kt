@@ -1,4 +1,4 @@
-package com.xquisito.crew
+package com.even.crew
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -42,7 +42,7 @@ class MainActivity : TauriActivity() {
   }
 
   private fun startForegroundService() {
-    val intent = Intent(this, XquisitoForegroundService::class.java)
+    val intent = Intent(this, EvenForegroundService::class.java)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       startForegroundService(intent)
     } else {

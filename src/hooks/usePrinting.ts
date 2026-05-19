@@ -88,11 +88,11 @@ function buildTicket(
   const num = identifier.match(/\d+/)?.[0];
   let mesaLine: string;
   if (/habitaci/i.test(identifier) || /cuarto/i.test(identifier)) {
-    mesaLine = `HABITACION: ${num || identifier} MESERO: XQUISITO\n\n`;
+    mesaLine = `HABITACION: ${num || identifier} MESERO: EVEN\n\n`;
   } else if (/pick/i.test(identifier)) {
-    mesaLine = `MESERO: XQUISITO\n\n`;
+    mesaLine = `MESERO: EVEN\n\n`;
   } else {
-    mesaLine = `MESA: ${num ? String(num).padStart(2, "0") : identifier} MESERO: XQUISITO\n\n`;
+    mesaLine = `MESA: ${num ? String(num).padStart(2, "0") : identifier} MESERO: EVEN\n\n`;
   }
   buf.push(...encodeText(`\n${roleLabel} ORDEN: ${ordenLabel}\n`));
   buf.push(...encodeText(`${fecha}\n`));

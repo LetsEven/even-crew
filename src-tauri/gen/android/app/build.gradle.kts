@@ -16,18 +16,18 @@ val tauriProperties = Properties().apply {
 
 android {
     compileSdk = 36
-    namespace = "com.xquisito.crew"
+    namespace = "com.even.crew"
     signingConfigs {
         create("release") {
-            storeFile = file("../../../../xquisito-crew.keystore")
-            storePassword = "xquisito"
-            keyAlias = "xquisito"
-            keyPassword = "xquisito"
+            storeFile = file("../../../../even-crew.keystore")
+            storePassword = "evencrew"
+            keyAlias = "even"
+            keyPassword = "evencrew"
         }
     }
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-        applicationId = "com.xquisito.crew"
+        applicationId = "com.even.crew"
         minSdk = 26
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()

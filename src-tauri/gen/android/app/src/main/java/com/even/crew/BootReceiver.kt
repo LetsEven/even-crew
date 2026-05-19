@@ -1,4 +1,4 @@
-package com.xquisito.crew
+package com.even.crew
 
 import android.content.BroadcastReceiver
 import android.content.Context

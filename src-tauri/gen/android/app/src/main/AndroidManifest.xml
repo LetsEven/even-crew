@@ -18,7 +18,7 @@
     <application
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@style/Theme.xquisito_crew"
+        android:theme="@style/Theme.even_crew"
         android:usesCleartextTraffic="${usesCleartextTraffic}">
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
@@ -64,12 +64,12 @@
         </receiver>
 
         <service
-            android:name=".XquisitoForegroundService"
+            android:name=".EvenForegroundService"
             android:foregroundServiceType="dataSync"
             android:exported="false" />
 
         <service
-            android:name=".XquisitoFirebaseService"
+            android:name=".EvenFirebaseService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />

@@ -5,7 +5,7 @@ import type { PrintJobData } from "./usePrinting";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const CREW_SECRET =
-  import.meta.env.VITE_CREW_SOCKET_SECRET || "xquisito-crew-secret";
+  import.meta.env.VITE_CREW_SOCKET_SECRET || "even-crew-secret";
 
 export interface CrewDevice {
   deviceId: string;
