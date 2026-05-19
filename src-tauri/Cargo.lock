@@ -1014,6 +1014,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "even-crew"
+version = "1.0.0"
+dependencies = [
+ "local-ip-address",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-notification",
+ "tokio",
+ "windows 0.58.0",
+]
+
+[[package]]
 name = "event-listener"
 version = "5.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5606,21 +5621,6 @@ dependencies = [
  "libc",
  "once_cell",
  "pkg-config",
-]
-
-[[package]]
-name = "even-crew"
-version = "1.0.0"
-dependencies = [
- "local-ip-address",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-notification",
- "tokio",
- "windows 0.58.0",
 ]
 
 [[package]]

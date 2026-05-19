@@ -8,7 +8,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.view.WindowManager
-import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import com.google.firebase.messaging.FirebaseMessaging
 import java.io.File
@@ -18,16 +17,7 @@ class MainActivity : TauriActivity() {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
 
-    // Kiosk: pantalla siempre encendida
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-    // Kiosk: bloquear botón back
-    onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-      override fun handleOnBackPressed() {}
-    })
-
-    // Kiosk: fijar la app en pantalla (lock task)
-    startLockTask()
 
     createNotificationChannel()
     startForegroundService()
