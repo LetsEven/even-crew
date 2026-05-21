@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Order, DishStatus, CookingStatus } from "../types";
+import type { Branch } from "../services/api";
 import OrderCard from "./OrderCard";
 
 interface OrderCarouselProps {
@@ -12,12 +13,16 @@ interface OrderCarouselProps {
     status: DishStatus,
   ) => void;
   onOrderCookingStatusChange: (orderId: string, status: CookingStatus) => void;
+  currentBranch?: Branch | null;
+  onOrdersRefresh?: () => void;
 }
 
 export default function OrderCarousel({
   orders,
   onDishStatusChange,
   onOrderCookingStatusChange,
+  currentBranch,
+  onOrdersRefresh,
 }: OrderCarouselProps) {
   const [index, setIndex] = useState(0);
   const safeIndex = Math.min(index, Math.max(0, orders.length - 1));
@@ -83,6 +88,8 @@ export default function OrderCarousel({
           onDishStatusChange(order.id, order.orderType, dishId, status)
         }
         onOrderCookingStatusChange={onOrderCookingStatusChange}
+        currentBranch={currentBranch}
+        onPaymentRegistered={onOrdersRefresh}
       />
     </div>
   );

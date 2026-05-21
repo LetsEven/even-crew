@@ -1,5 +1,9 @@
+import { useState } from "react";
+import { Banknote } from "lucide-react";
 import type { Order, DishStatus, CookingStatus } from "../types";
+import type { Branch } from "../services/api";
 import DishItem from "./DishItem";
+import CashPaymentModal from "./CashPaymentModal";
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
   tap: "Tap Order & Pay",
@@ -41,6 +45,8 @@ interface OrderCardProps {
   order: Order;
   onDishStatusChange: (dishId: string, status: DishStatus) => void;
   onOrderCookingStatusChange?: (orderId: string, status: CookingStatus) => void;
+  currentBranch?: Branch | null;
+  onPaymentRegistered?: () => void;
 }
 
 function formatTime(iso: string) {
@@ -57,11 +63,19 @@ export default function OrderCard({
   order,
   onDishStatusChange,
   onOrderCookingStatusChange,
+  currentBranch,
+  onPaymentRegistered,
 }: OrderCardProps) {
   const isPickAndGo = order.orderType === "pick_and_go";
   const delivered = order.dishes.filter((d) => d.status === "delivered").length;
   const total = order.dishes.length;
   const currentCookingStatus = order.cookingStatus ?? "preparing";
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  const canRegisterPayment =
+    order.orderType === "flex_bill" &&
+    (order.remainingAmount ?? 0) > 0 &&
+    currentBranch != null;
 
   return (
     <div
@@ -151,7 +165,8 @@ export default function OrderCard({
       {order.orderType === "flex_bill" &&
         (order.totalAmount != null ||
           order.paidAmount != null ||
-          (order.payments?.length ?? 0) > 0) && (
+          (order.payments?.length ?? 0) > 0 ||
+          canRegisterPayment) && (
           <div className="px-5 pb-5 pt-2 border-t border-white/10 flex flex-col gap-2">
             {order.orderType === "flex_bill" &&
               (order.totalAmount != null || order.paidAmount != null) && (
@@ -207,8 +222,30 @@ export default function OrderCard({
                 ))}
               </div>
             )}
+
+            {canRegisterPayment && (
+              <button
+                onClick={() => setShowPaymentModal(true)}
+                className="mt-1 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-sm font-medium hover:bg-emerald-500/25 transition-colors active:scale-[0.98]"
+              >
+                <Banknote className="w-4 h-4" />
+                Registrar pago
+              </button>
+            )}
           </div>
         )}
+
+      {showPaymentModal && currentBranch && (
+        <CashPaymentModal
+          order={order}
+          branch={currentBranch}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={() => {
+            setShowPaymentModal(false);
+            onPaymentRegistered?.();
+          }}
+        />
+      )}
     </div>
   );
 }

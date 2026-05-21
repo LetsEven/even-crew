@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useClerk, useAuth } from "@clerk/clerk-react";
 import {
   LogOut,
@@ -6,6 +6,8 @@ import {
   RefreshCw,
   ChevronDown,
   Check,
+  Menu,
+  History,
 } from "lucide-react";
 import OrderCarousel from "../components/OrderCarousel";
 import { deleteFcmToken } from "../services/api";
@@ -62,6 +64,7 @@ async function requestNotificationPermission() {
 
 interface Props {
   onOpenPrinters: () => void;
+  onOpenHistorial: () => void;
   orders: Order[];
   loading: boolean;
   error: string | null;
@@ -85,6 +88,7 @@ interface Props {
 
 export default function Kitchen({
   onOpenPrinters,
+  onOpenHistorial,
   orders,
   loading,
   error,
@@ -98,8 +102,20 @@ export default function Kitchen({
   onBranchChange,
 }: Props) {
   const [branchOpen, setBranchOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { signOut } = useClerk();
   const { getToken } = useAuth();
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
 
   const handleSignOut = useCallback(async () => {
     try {
@@ -187,30 +203,68 @@ export default function Kitchen({
       )}
 
       {/* Header */}
-      <header className="px-5 pt-5 pb-2 flex items-center justify-between">
-        <img src="/logo-short-green.webp" className="w-8 h-8" alt="Even" />
-        <div className="flex items-center gap-1">
+      <header className="px-5 pt-5 pb-2 flex items-center justify-between relative">
+        {/* Hamburger menu */}
+        <div ref={menuRef} className="relative">
           <button
-            onClick={() => fetchOrders(true)}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors text-sm disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            Actualizar
-          </button>
-          <button
-            onClick={onOpenPrinters}
+            onClick={() => setMenuOpen((v) => !v)}
             className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
           >
-            <PrinterIcon className="w-4 h-4" />
+            <Menu className="w-5 h-5" />
           </button>
-          <button
-            onClick={handleSignOut}
-            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          {menuOpen && (
+            <div className="absolute top-full left-0 mt-1 w-48 bg-[#0a3238] border border-white/10 rounded-2xl overflow-hidden shadow-xl z-50">
+              <button
+                onClick={() => {
+                  onOpenPrinters();
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/10 transition-colors"
+              >
+                <PrinterIcon className="w-4 h-4 shrink-0" />
+                Impresoras
+              </button>
+              <button
+                onClick={() => {
+                  onOpenHistorial();
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/10 transition-colors"
+              >
+                <History className="w-4 h-4 shrink-0" />
+                Historial
+              </button>
+              <div className="h-px bg-white/10 mx-3" />
+              <button
+                onClick={() => {
+                  handleSignOut();
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-rose-400 hover:bg-white/10 transition-colors"
+              >
+                <LogOut className="w-4 h-4 shrink-0" />
+                Cerrar sesión
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Logo centrado */}
+        <img
+          src="/logo-short-green.webp"
+          className="absolute left-1/2 -translate-x-1/2 w-8 h-8"
+          alt="Even"
+        />
+
+        {/* Actualizar */}
+        <button
+          onClick={() => fetchOrders(true)}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors text-sm disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          Actualizar
+        </button>
       </header>
 
       {/* Logo central */}
@@ -299,6 +353,8 @@ export default function Kitchen({
             orders={orders}
             onDishStatusChange={updateDish}
             onOrderCookingStatusChange={updateOrderCookingStatus}
+            currentBranch={branches.find((b) => b.id === branchId) ?? null}
+            onOrdersRefresh={() => fetchOrders()}
           />
         )}
       </div>

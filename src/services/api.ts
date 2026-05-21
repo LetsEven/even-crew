@@ -1,4 +1,4 @@
-import type { Order } from "../types";
+import type { Order, TableSummary, DishOrderCrew } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -21,6 +21,12 @@ async function authFetch(
 
 export async function getActiveOrders(token: string, branchId?: string | null): Promise<Order[]> {
   const url = branchId ? `/api/kitchen/orders?branchId=${branchId}` : "/api/kitchen/orders";
+  const data = await authFetch(url, token);
+  return data.orders ?? [];
+}
+
+export async function getOrderHistory(token: string, branchId?: string | null): Promise<Order[]> {
+  const url = branchId ? `/api/kitchen/orders/history?branchId=${branchId}` : "/api/kitchen/orders/history";
   const data = await authFetch(url, token);
   return data.orders ?? [];
 }
@@ -83,6 +89,7 @@ export interface Branch {
   id: string;
   name: string;
   branch_number: number;
+  restaurant_id: number;
 }
 
 export async function getBranches(token: string): Promise<Branch[]> {
@@ -123,6 +130,134 @@ export async function syncPrinters(
     body: JSON.stringify({ branchId, printers }),
   });
   return data.printers ?? [];
+}
+
+export async function getTableSummary(
+  restaurantId: string,
+  branchNumber: string,
+  tableNumber: string,
+  token: string,
+): Promise<TableSummary> {
+  const data = await authFetch(
+    `/api/restaurants/${restaurantId}/branches/${branchNumber}/tables/${tableNumber}/summary`,
+    token,
+  );
+  return data.data ?? data.summary ?? data;
+}
+
+export async function getDishOrders(
+  restaurantId: string,
+  branchNumber: string,
+  tableNumber: string,
+  token: string,
+): Promise<DishOrderCrew[]> {
+  const data = await authFetch(
+    `/api/restaurants/${restaurantId}/branches/${branchNumber}/tables/${tableNumber}/orders`,
+    token,
+  );
+  return data.data ?? data.dishOrders ?? data.orders ?? [];
+}
+
+export interface PayTableManualParams {
+  restaurantId: string;
+  branchNumber: string;
+  tableNumber: string;
+  amount: number;
+  guestName: string;
+}
+
+export async function payTableManual(
+  params: PayTableManualParams,
+  token: string,
+): Promise<void> {
+  const { restaurantId, branchNumber, tableNumber, amount, guestName } = params;
+  await authFetch(
+    `/api/restaurants/${restaurantId}/branches/${branchNumber}/tables/${tableNumber}/pay`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        amount,
+        paymentMethodId: null,
+        guestName,
+        userId: null,
+      }),
+    },
+  );
+}
+
+export async function payDishOrderManual(
+  dishId: string,
+  guestName: string,
+  token: string,
+  restaurantId?: string,
+  branchNumber?: string,
+  tableNumber?: string,
+): Promise<void> {
+  await authFetch(`/api/dishes/${dishId}/pay`, token, {
+    method: "POST",
+    body: JSON.stringify({
+      paymentMethodId: null,
+      guestName,
+      restaurantId: restaurantId ?? undefined,
+      branchNumber: branchNumber ?? undefined,
+      tableNumber: tableNumber ?? undefined,
+    }),
+  });
+}
+
+export interface CreateManualTransactionParams {
+  id_table_order: string;
+  restaurant_id: number;
+  base_amount: number;
+  tip_amount: number;
+  iva_tip: number;
+  total_amount_charged: number;
+  subtotal_for_commission: number;
+  even_commission_total: number;
+  even_commission_client: number;
+  even_commission_restaurant: number;
+  iva_even_client: number;
+  iva_even_restaurant: number;
+  even_client_charge: number;
+  even_restaurant_charge: number;
+  even_rate_applied: number;
+  transaction_by: string;
+  payment_source: "cash" | "terminal";
+  manual_reference: string | null;
+  currency?: string;
+}
+
+export async function createManualTransaction(
+  params: CreateManualTransactionParams,
+  token: string,
+): Promise<void> {
+  await authFetch("/api/payment-transactions", token, {
+    method: "POST",
+    body: JSON.stringify({
+      payment_method_id: null,
+      restaurant_id: params.restaurant_id,
+      id_table_order: params.id_table_order,
+      base_amount: params.base_amount,
+      tip_amount: params.tip_amount,
+      iva_tip: params.iva_tip,
+      even_commission_total: params.even_commission_total,
+      even_commission_client: params.even_commission_client,
+      even_commission_restaurant: params.even_commission_restaurant,
+      iva_even_client: params.iva_even_client,
+      iva_even_restaurant: params.iva_even_restaurant,
+      even_client_charge: params.even_client_charge,
+      even_restaurant_charge: params.even_restaurant_charge,
+      even_rate_applied: params.even_rate_applied,
+      total_amount_charged: params.total_amount_charged,
+      subtotal_for_commission: params.subtotal_for_commission,
+      currency: params.currency ?? "MXN",
+      transaction_by: params.transaction_by,
+      payment_source: params.payment_source,
+      manual_reference: params.manual_reference,
+      ecartpay_order_id: null,
+    }),
+  });
 }
 
 export async function updatePrinter(

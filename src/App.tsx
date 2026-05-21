@@ -3,6 +3,7 @@ import { useAuth, useSignIn } from "@clerk/clerk-react";
 import { Mail, KeyRound, Loader2, Eye, EyeOff } from "lucide-react";
 import Kitchen from "./pages/Kitchen";
 import Printers from "./pages/Printers";
+import Historial from "./pages/Historial";
 import { useSocket } from "./hooks/useSocket";
 import type { CrewDevice } from "./hooks/useSocket";
 import { usePrinting } from "./hooks/usePrinting";
@@ -12,7 +13,7 @@ import type { Branch } from "./services/api";
 import type { DishStatus } from "./types";
 import { getOrCreateDeviceId } from "./utils/deviceId";
 
-type Page = "kitchen" | "printers";
+type Page = "kitchen" | "printers" | "historial";
 
 async function showWindowIfNeeded() {
   try {
@@ -329,9 +330,23 @@ export default function App() {
     );
   }
 
+  if (page === "historial") {
+    return (
+      <Historial
+        onBack={() => setPage("kitchen")}
+        onOpenPrinters={() => setPage("printers")}
+        branches={branches}
+        branchesLoading={branchesLoading}
+        branchId={branchId}
+        onBranchChange={handleBranchChange}
+      />
+    );
+  }
+
   return (
     <Kitchen
       onOpenPrinters={() => setPage("printers")}
+      onOpenHistorial={() => setPage("historial")}
       orders={orders}
       loading={ordersLoading}
       error={ordersError}
