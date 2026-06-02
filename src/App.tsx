@@ -17,11 +17,8 @@ type Page = "kitchen" | "printers" | "historial";
 
 async function showWindowIfNeeded() {
   try {
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    const win = getCurrentWindow();
-    await win.show();
-    await win.unminimize();
-    await win.setFocus();
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("show_main_window");
   } catch {}
 }
 
