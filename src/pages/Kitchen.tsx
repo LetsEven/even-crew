@@ -79,7 +79,8 @@ interface Props {
     orderId: string,
     status: CookingStatus,
   ) => Promise<void>;
-  newOrderAlert: boolean;
+  newOrderAlertCount: number;
+  onDismissAlert: () => void;
   branches: Branch[];
   branchesLoading: boolean;
   branchId: string | null;
@@ -95,7 +96,8 @@ export default function Kitchen({
   fetchOrders,
   updateDish,
   updateOrderCookingStatus,
-  newOrderAlert,
+  newOrderAlertCount,
+  onDismissAlert,
   branches,
   branchesLoading,
   branchId,
@@ -192,13 +194,22 @@ export default function Kitchen({
       }}
     >
       {/* Banner nueva orden */}
-      {newOrderAlert && (
+      {newOrderAlertCount > 0 && (
         <div
-          className="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-emerald-500 text-white px-5 py-2.5 rounded-full font-semibold text-sm shadow-lg pointer-events-none"
+          className="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-emerald-500 text-white pl-5 pr-3 py-2.5 rounded-full font-semibold text-sm shadow-lg"
           style={{ animation: "fadeSlideDown 0.25s ease" }}
         >
           <span className="w-2 h-2 rounded-full bg-white animate-ping inline-block" />
-          Nueva orden recibida
+          {newOrderAlertCount === 1
+            ? "Nueva orden recibida"
+            : `${newOrderAlertCount} nuevas órdenes`}
+          <button
+            onClick={onDismissAlert}
+            className="ml-1 bg-white/20 hover:bg-white/40 rounded-full p-1 transition-colors cursor-pointer"
+            title="Dismiss"
+          >
+            <Check className="w-4 h-4" />
+          </button>
         </div>
       )}
 

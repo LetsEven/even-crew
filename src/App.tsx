@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAuth, useSignIn } from "@clerk/clerk-react";
 import { Mail, KeyRound, Loader2, Eye, EyeOff } from "lucide-react";
 import Kitchen from "./pages/Kitchen";
@@ -25,6 +25,30 @@ async function showWindowIfNeeded() {
       const { invoke } = await import("@tauri-apps/api/core");
       await invoke("show_main_window");
     }
+  } catch {}
+}
+
+async function flashTaskbarIcon() {
+  try {
+    const { getCurrentWindow, UserAttentionType } = await import(
+      "@tauri-apps/api/window"
+    );
+    await getCurrentWindow().requestUserAttention(UserAttentionType.Critical);
+  } catch {}
+}
+
+function playNotificationSound() {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.6);
   } catch {}
 }
 
@@ -89,8 +113,7 @@ export default function App() {
   const [showPassword, setShowPassword] = useState(false);
 
   // Estado de nueva orden (banner) — vive en App para no perderse al navegar
-  const [newOrderAlert, setNewOrderAlert] = useState(false);
-  const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [newOrderAlertCount, setNewOrderAlertCount] = useState(0);
 
   // Inicializar permisos de notificación una sola vez al arrancar
   useEffect(() => {
@@ -175,12 +198,16 @@ export default function App() {
       "[CREW:ORDER] 🔔 Nueva orden recibida — ejecutando refetch + notificación",
     );
     fetchOrders();
-    setNewOrderAlert(true);
-    if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
-    alertTimerRef.current = setTimeout(() => setNewOrderAlert(false), 3500);
+    setNewOrderAlertCount((prev) => prev + 1);
+    playNotificationSound();
+    flashTaskbarIcon();
     sendDesktopNotification("Even Crew", "Nueva orden recibida");
     showWindowIfNeeded();
   }, [fetchOrders]);
+
+  const handleDismissAlert = useCallback(() => {
+    setNewOrderAlertCount(0);
+  }, []);
 
   const handleSilentRefetch = useCallback(() => {
     fetchOrders();
@@ -353,7 +380,8 @@ export default function App() {
       fetchOrders={fetchOrders}
       updateDish={updateDish}
       updateOrderCookingStatus={updateOrderCookingStatus}
-      newOrderAlert={newOrderAlert}
+      newOrderAlertCount={newOrderAlertCount}
+      onDismissAlert={handleDismissAlert}
       branches={branches}
       branchesLoading={branchesLoading}
       branchId={branchId}
