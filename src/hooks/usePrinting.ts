@@ -7,6 +7,9 @@ const DEVICE_ID_KEY = "crew_device_id";
 
 export interface PrintJobData {
   branchId: string;
+  jobId?: string; // ID en print_job_queue — presente cuando viene de la cola confiable
+  wasFlowHeld?: boolean;
+  notifyOnPrint?: boolean;
   items: {
     name: string;
     quantity: number;
@@ -189,7 +192,7 @@ export function usePrinting() {
 
       if (printer.connection_type === "usb" && printer.usb_device_name) {
         console.log(`[PRINT] 🖨️ Enviando a USB: ${printer.usb_device_name}`);
-        invoke("print_raw_usb", {
+        await invoke("print_raw_usb", {
           printerName: printer.usb_device_name,
           data: ticket,
         }).catch((e) =>
@@ -199,7 +202,7 @@ export function usePrinting() {
         console.log(
           `[PRINT] 🖨️ Enviando a WiFi: ${printer.ip}:${printer.port}`,
         );
-        invoke("print_raw", {
+        await invoke("print_raw", {
           ip: printer.ip,
           port: printer.port,
           data: ticket,

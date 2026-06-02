@@ -121,12 +121,10 @@ export function useSocket({
       },
     );
 
-    socket.on(
-      "dashboard:new-transaction",
-      (data: { notifyKitchen?: boolean }) => {
-        if (data?.notifyKitchen !== false) onRefetchRef.current();
-      },
-    );
+    socket.on("dashboard:new-transaction", (_data: unknown) => {
+      // Notificación viene de kitchen:notify — aquí solo refrescamos silenciosamente
+      onSilentRefetchRef.current?.();
+    });
 
     socket.on(
       "dashboard:order-update",
@@ -164,11 +162,31 @@ export function useSocket({
       },
     );
 
-    socket.on("kitchen:print_job", (data: PrintJobData) => {
+    socket.on(
+      "kitchen:notify",
+      (data: { wasFlowHeld?: boolean; orderType?: string }) => {
+        console.log(
+          `[CREW:SOCKET] 🔔 kitchen:notify — wasFlowHeld=${data?.wasFlowHeld} orderType=${data?.orderType}`,
+        );
+        onRefetchRef.current();
+      },
+    );
+
+    socket.on("kitchen:print_job", async (data: PrintJobData) => {
       console.log(
-        `[CREW:SOCKET] 🖨️ kitchen:print_job recibido — branchId=${data.branchId} identifier=${data.orderInfo?.identifier} items=${data.items?.length}`,
+        `[CREW:SOCKET] 🖨️ kitchen:print_job recibido — branchId=${data.branchId} identifier=${data.orderInfo?.identifier} items=${data.items?.length} jobId=${data.jobId}`,
       );
-      onPrintJobRef.current?.(data);
+      try {
+        await onPrintJobRef.current?.(data);
+        if (data.jobId) {
+          socket.emit("print_job_ack", { jobId: data.jobId });
+          console.log(
+            `[CREW:SOCKET] ✅ print_job_ack enviado — jobId=${data.jobId}`,
+          );
+        }
+      } catch (e) {
+        console.error("[CREW:SOCKET] ❌ Error en print_job:", e);
+      }
     });
 
     socket.on("connect_error", (err) => {
