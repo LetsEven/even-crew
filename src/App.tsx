@@ -19,12 +19,9 @@ async function showWindowIfNeeded() {
   try {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     const win = getCurrentWindow();
-    const isVisible = await win.isVisible();
-    const isMinimized = await win.isMinimized();
-    if (!isVisible || isMinimized) {
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("show_main_window");
-    }
+    await win.show();
+    await win.unminimize();
+    await win.setFocus();
   } catch {}
 }
 
