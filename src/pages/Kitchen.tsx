@@ -308,9 +308,21 @@ export default function Kitchen({
             )}
           </div>
         )}
-        <p className="text-white/50 text-sm">
-          {orders.length} orden(es) pendiente(s)
-        </p>
+        {(() => {
+          const currentBranch = branches.find((b) => b.id === branchId);
+          const max = currentBranch?.max_pending_orders ?? null;
+          const count = orders.length;
+          const atLimit = max !== null && count >= max;
+          return (
+            <p
+              className={`text-sm ${atLimit ? "text-amber-400 font-semibold" : "text-white/50"}`}
+            >
+              {max !== null
+                ? `${count} / ${max} orden(es) activas${atLimit ? " ⚠️" : ""}`
+                : `${count} orden(es) pendiente(s)`}
+            </p>
+          );
+        })()}
       </div>
 
       {/* Panel oscuro inferior */}

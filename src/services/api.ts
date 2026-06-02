@@ -19,14 +19,24 @@ async function authFetch(
   return res.json();
 }
 
-export async function getActiveOrders(token: string, branchId?: string | null): Promise<Order[]> {
-  const url = branchId ? `/api/kitchen/orders?branchId=${branchId}` : "/api/kitchen/orders";
+export async function getActiveOrders(
+  token: string,
+  branchId?: string | null,
+): Promise<Order[]> {
+  const url = branchId
+    ? `/api/kitchen/orders?branchId=${branchId}`
+    : "/api/kitchen/orders";
   const data = await authFetch(url, token);
   return data.orders ?? [];
 }
 
-export async function getOrderHistory(token: string, branchId?: string | null): Promise<Order[]> {
-  const url = branchId ? `/api/kitchen/orders/history?branchId=${branchId}` : "/api/kitchen/orders/history";
+export async function getOrderHistory(
+  token: string,
+  branchId?: string | null,
+): Promise<Order[]> {
+  const url = branchId
+    ? `/api/kitchen/orders/history?branchId=${branchId}`
+    : "/api/kitchen/orders/history";
   const data = await authFetch(url, token);
   return data.orders ?? [];
 }
@@ -90,6 +100,7 @@ export interface Branch {
   name: string;
   branch_number: number;
   restaurant_id: number;
+  max_pending_orders?: number | null;
 }
 
 export async function getBranches(token: string): Promise<Branch[]> {
@@ -122,7 +133,12 @@ export async function syncPrinters(
   branchId: string,
   printers: (
     | { ip: string; port: number; connection_type?: "wifi" }
-    | { usb_device_name: string; vendor_id?: number; product_id?: number; connection_type: "usb" }
+    | {
+        usb_device_name: string;
+        vendor_id?: number;
+        product_id?: number;
+        connection_type: "usb";
+      }
   )[],
 ): Promise<PrinterRecord[]> {
   const data = await authFetch("/api/kitchen/printers/sync", token, {
