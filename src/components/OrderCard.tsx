@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { Banknote } from "lucide-react";
 import type { Order, DishStatus, CookingStatus } from "../types";
 import type { Branch } from "../services/api";
@@ -57,6 +57,26 @@ function formatTime(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatTimeOnly(iso: string) {
+  return new Date(iso).toLocaleString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function paymentTypeLabel(cardType: string | null): string {
+  if (cardType === "cash") return "Efectivo";
+  if (cardType === "terminal") return "Terminal";
+  if (
+    cardType === "debit" ||
+    cardType === "credit" ||
+    cardType === "digital_wallet"
+  )
+    return "Digital";
+  return "—";
 }
 
 export default function OrderCard({
@@ -198,27 +218,40 @@ export default function OrderCard({
                 </div>
               )}
             {(order.payments?.length ?? 0) > 0 && (
-              <div className="flex flex-col divide-y divide-white/10 border-t border-white/10 pt-2">
+              <div className="border-t border-white/10 pt-2 grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-3 items-center">
+                <span className="text-[10px] uppercase text-white/30 font-medium pb-1">
+                  Hora
+                </span>
+                <span className="text-[10px] uppercase text-white/30 font-medium pb-1">
+                  Quién
+                </span>
+                <span className="text-[10px] uppercase text-white/30 font-medium pb-1">
+                  Tipo
+                </span>
+                <span className="text-[10px] uppercase text-white/30 font-medium text-right pb-1">
+                  Monto
+                </span>
+                <span className="text-[10px] uppercase text-white/30 font-medium text-right pb-1">
+                  Prop
+                </span>
                 {order.payments!.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between text-xs gap-2 py-1.5"
-                  >
-                    <span className="text-white/40">
-                      {formatTime(p.createdAt)}
+                  <Fragment key={p.id}>
+                    <span className="text-white/40 text-xs py-1.5 border-t border-white/10">
+                      {formatTimeOnly(p.createdAt)}
                     </span>
-                    {p.guestName && (
-                      <span className="text-white/60">{p.guestName}</span>
-                    )}
-                    <span className="text-emerald-400 font-medium">
+                    <span className="text-white/60 text-xs truncate py-1.5 border-t border-white/10">
+                      {p.guestName ?? "—"}
+                    </span>
+                    <span className="text-white/50 text-xs py-1.5 border-t border-white/10">
+                      {paymentTypeLabel(p.cardType)}
+                    </span>
+                    <span className="text-emerald-400 text-xs font-medium text-right py-1.5 border-t border-white/10">
                       ${p.baseAmount.toFixed(2)}
                     </span>
-                    {p.tipAmount > 0 && (
-                      <span className="text-white/30">
-                        +${p.tipAmount.toFixed(2)} prop
-                      </span>
-                    )}
-                  </div>
+                    <span className="text-white/30 text-xs text-right py-1.5 border-t border-white/10">
+                      {p.tipAmount > 0 ? `+$${p.tipAmount.toFixed(2)}` : "—"}
+                    </span>
+                  </Fragment>
                 ))}
               </div>
             )}

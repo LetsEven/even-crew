@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useAuth, useSignIn } from "@clerk/clerk-react";
 import { Mail, KeyRound, Loader2, Eye, EyeOff } from "lucide-react";
 import Kitchen from "./pages/Kitchen";
@@ -106,8 +106,18 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Estado de nueva orden (banner) — vive en App para no perderse al navegar
-  const [newOrderAlertCount, setNewOrderAlertCount] = useState(0);
+  // Cola de notificaciones por orden — vive en App para no perderse al navegar
+  type OrderNotif = {
+    id: string;
+    folio: string | number | null;
+    customerName: string | null;
+    identifier: string;
+    orderedBy: string | null;
+  };
+  const [newOrderNotifications, setNewOrderNotifications] = useState<
+    OrderNotif[]
+  >([]);
+  const prevOrderIdsRef = useRef<Set<string> | null>(null);
 
   // Inicializar permisos de notificación una sola vez al arrancar
   useEffect(() => {
@@ -187,20 +197,53 @@ export default function App() {
       updateDishFromSocket(dishId, status),
     [updateDishFromSocket],
   );
-  const handleRefetch = useCallback(() => {
+  // Inicializar prevOrderIdsRef tras la primera carga (sin notificar)
+  useEffect(() => {
+    if (prevOrderIdsRef.current === null) {
+      prevOrderIdsRef.current = new Set(orders.map((o) => o.id));
+    }
+  }, [orders]);
+
+  const handleRefetch = useCallback(async () => {
     console.log(
       "[CREW:ORDER] 🔔 Nueva orden recibida — ejecutando refetch + notificación",
     );
-    fetchOrders();
-    setNewOrderAlertCount((prev) => prev + 1);
+    const fetched = await fetchOrders();
+    if (!fetched) return;
+
+    if (prevOrderIdsRef.current === null) {
+      prevOrderIdsRef.current = new Set(fetched.map((o) => o.id));
+      return;
+    }
+
+    const newOnes = fetched.filter((o) => !prevOrderIdsRef.current!.has(o.id));
+    prevOrderIdsRef.current = new Set(fetched.map((o) => o.id));
+
+    if (newOnes.length === 0) return;
+
+    setNewOrderNotifications((prev) => [
+      ...prev,
+      ...newOnes.map((o) => ({
+        id: o.id,
+        folio: o.folio ?? null,
+        customerName: o.customerName ?? null,
+        identifier: o.identifier,
+        orderedBy: o.dishes.find((d) => d.orderedBy)?.orderedBy ?? null,
+      })),
+    ]);
     playNotificationSound();
     flashTaskbarIcon();
-    sendDesktopNotification("Even Crew", "Nueva orden recibida");
+    sendDesktopNotification(
+      "Even Crew",
+      newOnes.length === 1
+        ? "Nueva orden recibida"
+        : `${newOnes.length} nuevas órdenes`,
+    );
     showWindowIfNeeded();
   }, [fetchOrders]);
 
-  const handleDismissAlert = useCallback(() => {
-    setNewOrderAlertCount(0);
+  const handleDismissAlert = useCallback((id: string) => {
+    setNewOrderNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
   const handleSilentRefetch = useCallback(() => {
@@ -374,7 +417,7 @@ export default function App() {
       fetchOrders={fetchOrders}
       updateDish={updateDish}
       updateOrderCookingStatus={updateOrderCookingStatus}
-      newOrderAlertCount={newOrderAlertCount}
+      newOrderNotifications={newOrderNotifications}
       onDismissAlert={handleDismissAlert}
       branches={branches}
       branchesLoading={branchesLoading}

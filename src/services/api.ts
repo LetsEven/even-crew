@@ -153,12 +153,12 @@ export async function getTableSummary(
   branchNumber: string,
   tableNumber: string,
   token: string,
-): Promise<TableSummary> {
+): Promise<TableSummary | null> {
   const data = await authFetch(
     `/api/restaurants/${restaurantId}/branches/${branchNumber}/tables/${tableNumber}/summary`,
     token,
   );
-  return data.data ?? data.summary ?? data;
+  return data.data ?? data.summary ?? null;
 }
 
 export async function getDishOrders(

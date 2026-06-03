@@ -172,7 +172,7 @@ export default function CashPaymentModal({
   }
 
   async function handleConfirm() {
-    if (!tableSummary || tableNumber == null) return;
+    if (tableNumber == null) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -182,7 +182,7 @@ export default function CashPaymentModal({
       const manualRef = method === "terminal" ? terminalRef.trim() : null;
 
       const txParams = {
-        id_table_order: tableSummary.table_order_id,
+        id_table_order: order.id,
         restaurant_id: branch.restaurant_id,
         base_amount: baseAmount,
         tip_amount: tipAmount,
