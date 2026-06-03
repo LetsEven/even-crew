@@ -25,6 +25,7 @@ export interface Dish {
   status: DishStatus;
   images: string[];
   orderedBy?: string | null;
+  userFolio?: string | null;
   customFields?: CustomField[] | null;
   specialInstructions?: string | null;
 }

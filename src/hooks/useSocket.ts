@@ -26,6 +26,7 @@ interface UseSocketProps {
     devices: CrewDevice[],
     masterDeviceId: string | null,
   ) => void;
+  onFlexbillOrder?: (data: { folio: string | null; orderedBy: string | null; identifier: string | null }) => void;
 }
 
 export function useSocket({
@@ -37,6 +38,7 @@ export function useSocket({
   onSilentRefetch,
   onPrintJob,
   onDevicesUpdated,
+  onFlexbillOrder,
 }: UseSocketProps) {
   // Refs para los callbacks — siempre actualizados, sin reconectar el socket
   const onOrderClosedRef = useRef(onOrderClosed);
@@ -45,6 +47,7 @@ export function useSocket({
   const onSilentRefetchRef = useRef(onSilentRefetch);
   const onPrintJobRef = useRef(onPrintJob);
   const onDevicesUpdatedRef = useRef(onDevicesUpdated);
+  const onFlexbillOrderRef = useRef(onFlexbillOrder);
 
   useEffect(() => {
     onOrderClosedRef.current = onOrderClosed;
@@ -63,6 +66,9 @@ export function useSocket({
   });
   useEffect(() => {
     onDevicesUpdatedRef.current = onDevicesUpdated;
+  });
+  useEffect(() => {
+    onFlexbillOrderRef.current = onFlexbillOrder;
   });
 
   const socketRef = useRef<Socket | null>(null);
@@ -164,11 +170,25 @@ export function useSocket({
 
     socket.on(
       "kitchen:notify",
-      (data: { wasFlowHeld?: boolean; orderType?: string }) => {
+      (data: {
+        wasFlowHeld?: boolean;
+        orderType?: string;
+        folio?: string | null;
+        orderedBy?: string | null;
+        identifier?: string | null;
+      }) => {
         console.log(
-          `[CREW:SOCKET] 🔔 kitchen:notify — wasFlowHeld=${data?.wasFlowHeld} orderType=${data?.orderType}`,
+          `[CREW:SOCKET] 🔔 kitchen:notify — wasFlowHeld=${data?.wasFlowHeld} orderType=${data?.orderType} folio=${data?.folio}`,
         );
         onRefetchRef.current();
+        // For Flexbill: fire a direct per-user_order notification
+        if (data?.orderType === "flex_bill" && data?.folio) {
+          onFlexbillOrderRef.current?.({
+            folio: data.folio,
+            orderedBy: data.orderedBy ?? null,
+            identifier: data.identifier ?? null,
+          });
+        }
       },
     );
 

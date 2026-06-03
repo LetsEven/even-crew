@@ -197,12 +197,20 @@ export default function App() {
       updateDishFromSocket(dishId, status),
     [updateDishFromSocket],
   );
-  // Inicializar prevOrderIdsRef tras la primera carga (sin notificar)
+  // Resetear tracking de notificaciones al cambiar de sucursal
   useEffect(() => {
-    if (prevOrderIdsRef.current === null) {
+    prevOrderIdsRef.current = null;
+    setNewOrderNotifications([]);
+  }, [branchId]);
+
+  // Inicializar prevOrderIdsRef tras la primera carga real (sin notificar).
+  // Solo cuando la carga terminó (!ordersLoading) para evitar inicializar
+  // con [] mientras las órdenes aún están cargando tras un cambio de sucursal.
+  useEffect(() => {
+    if (prevOrderIdsRef.current === null && !ordersLoading) {
       prevOrderIdsRef.current = new Set(orders.map((o) => o.id));
     }
-  }, [orders]);
+  }, [orders, ordersLoading]);
 
   const handleRefetch = useCallback(async () => {
     console.log(
@@ -216,7 +224,10 @@ export default function App() {
       return;
     }
 
-    const newOnes = fetched.filter((o) => !prevOrderIdsRef.current!.has(o.id));
+    // Flexbill se notifica por user_order vía handleFlexbillOrder, no aquí
+    const newOnes = fetched.filter(
+      (o) => !prevOrderIdsRef.current!.has(o.id) && o.orderType !== "flex_bill",
+    );
     prevOrderIdsRef.current = new Set(fetched.map((o) => o.id));
 
     if (newOnes.length === 0) return;
@@ -242,6 +253,35 @@ export default function App() {
     showWindowIfNeeded();
   }, [fetchOrders]);
 
+  // Notificación por cada user_order de Flexbill (una por persona/folio)
+  const handleFlexbillOrder = useCallback(
+    (data: {
+      folio: string | null;
+      orderedBy: string | null;
+      identifier: string | null;
+    }) => {
+      fetchOrders();
+      setNewOrderNotifications((prev) => [
+        ...prev,
+        {
+          id: `flexbill-${data.folio}`,
+          folio: data.folio,
+          customerName: null,
+          identifier: data.identifier ?? "Flex Bill",
+          orderedBy: null,
+        },
+      ]);
+      playNotificationSound();
+      flashTaskbarIcon();
+      sendDesktopNotification(
+        "Even Crew",
+        `Nueva orden${data.folio ? ` #${data.folio}` : ""}`,
+      );
+      showWindowIfNeeded();
+    },
+    [fetchOrders],
+  );
+
   const handleDismissAlert = useCallback((id: string) => {
     setNewOrderNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
@@ -259,6 +299,7 @@ export default function App() {
     onSilentRefetch: handleSilentRefetch,
     onPrintJob: printJob,
     onDevicesUpdated: handleDevicesUpdated,
+    onFlexbillOrder: handleFlexbillOrder,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {

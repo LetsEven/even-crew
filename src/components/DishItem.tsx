@@ -71,9 +71,12 @@ export default function DishItem({
             <p className="font-semibold text-white truncate">
               {dish.quantity} {dish.item}
             </p>
-            <p className="text-sm text-white/50">
-              {dish.orderedBy && (
-                <span className="ml-1 text-white/50">· {dish.orderedBy}</span>
+            <p className="text-sm text-white/50 flex gap-2">
+              {dish.orderedBy && <span>· {dish.orderedBy}</span>}
+              {dish.userFolio && (
+                <span className="shrink-0 text-sm font-mono font-semibold px-2 py-0.5 rounded-full bg-white/10 text-white/60">
+                  #{dish.userFolio}
+                </span>
               )}
             </p>
             {(() => {
