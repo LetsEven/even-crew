@@ -171,8 +171,13 @@ export default function App() {
   const handleDevicesUpdated = useCallback(
     (devices: CrewDevice[], master: string | null) => {
       setConnectedDevices(devices);
-      setMasterDeviceId(master);
-      setPrintingMaster(master);
+      // Si el master llega como null (se perdió por alguna razón), conservar el
+      // master previo para no perder la impresión del ticket. Solo actualizar
+      // cuando llega un master real (no-null).
+      if (master !== null) {
+        setMasterDeviceId(master);
+        setPrintingMaster(master);
+      }
     },
     [setPrintingMaster],
   );

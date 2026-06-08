@@ -10,7 +10,9 @@ import {
 export function useKitchenOrders(branchId: string | null) {
   const { getToken } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Inicia en true: siempre hay un fetch inicial. Evita que el efecto de
+  // inicialización de prevOrderIdsRef corra con orders=[] antes del primer fetch.
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchOrders = useCallback(
@@ -97,14 +99,25 @@ export function useKitchenOrders(branchId: string | null) {
         fetchOrders();
       }
 
-      // Si todos los dishes están entregados, remover la orden
+      // Si todos los dishes están entregados, remover la orden.
+      // Excepción flex_bill: la card se mantiene mientras la mesa no se haya
+      // pagado (igual que el filtro del backend), para no parpadear al entregar.
       setOrders((prev) =>
         prev.filter((order) => {
           if (order.id !== orderId) return true;
           const updated = order.dishes.map((d) =>
             d.id === dishId ? { ...d, status } : d,
           );
-          return updated.some((d) => d.status !== "delivered");
+          const hasUndelivered = updated.some((d) => d.status !== "delivered");
+          if (hasUndelivered) return true;
+          if (
+            order.orderType === "flex_bill" &&
+            (order.remainingAmount ?? 0) > 0 &&
+            order.status !== "paid"
+          ) {
+            return true;
+          }
+          return false;
         }),
       );
     },
@@ -161,9 +174,18 @@ export function useKitchenOrders(branchId: string | null) {
               d.id === dishId ? { ...d, status } : d,
             ),
           }))
-          .filter((order) =>
-            order.dishes.some((d) => d.status !== "delivered"),
-          ),
+          .filter((order) => {
+            if (order.dishes.some((d) => d.status !== "delivered")) return true;
+            // flex_bill: conservar mientras la mesa no se haya pagado
+            if (
+              order.orderType === "flex_bill" &&
+              (order.remainingAmount ?? 0) > 0 &&
+              order.status !== "paid"
+            ) {
+              return true;
+            }
+            return false;
+          }),
       );
     },
     [],

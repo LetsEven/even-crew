@@ -11,6 +11,7 @@ import {
 import { getOrderHistory } from "../services/api";
 import type { Branch } from "../services/api";
 import type { Order, OrderType } from "../types";
+import { formatFolio } from "../utils/folio";
 
 const ORDER_TYPE_LABELS: Record<OrderType, string> = {
   tap: "Tap Order & Pay",
@@ -271,8 +272,8 @@ export default function Historial({
                   <div className="flex items-center gap-3 text-xs text-white/40">
                     <span>{formatDateTime(order.createdAt)}</span>
                     {order.folio != null && (
-                      <span className="bg-white/10 px-2 py-0.5 rounded-full">
-                        #{String(order.folio).padStart(5, "0")}
+                      <span className="text-white/25 ml-1 font-mono text-xs bg-white/10 px-2 py-0.5 rounded-full">
+                        #{formatFolio(order.folio)}
                       </span>
                     )}
                   </div>
@@ -292,6 +293,11 @@ export default function Historial({
                           {dish.orderedBy && (
                             <span className="text-white/30 ml-1">
                               · {dish.orderedBy}
+                            </span>
+                          )}
+                          {dish.userFolio && (
+                            <span className="text-white/25 ml-1 font-mono text-xs bg-white/10 px-2 py-0.5 rounded-full">
+                              #{formatFolio(dish.userFolio)}
                             </span>
                           )}
                         </span>

@@ -1,4 +1,5 @@
 import type { CustomField, Dish, DishStatus } from "../types";
+import { formatFolio } from "../utils/folio";
 
 function getOptions(customFields: CustomField[] | null | undefined): string[] {
   if (!Array.isArray(customFields)) return [];
@@ -71,13 +72,15 @@ export default function DishItem({
             <p className="font-semibold text-white truncate">
               {dish.quantity} {dish.item}
             </p>
-            <p className="text-sm text-white/50 flex gap-2">
-              {dish.orderedBy && <span>· {dish.orderedBy}</span>}
+            <p className="ml-2">
               {dish.userFolio && (
-                <span className="shrink-0 text-sm font-mono font-semibold px-2 py-0.5 rounded-full bg-white/10 text-white/60">
-                  #{dish.userFolio}
+                <span className="shrink-0 text-lg font-mono font-semibold text-white/60">
+                  #{formatFolio(dish.userFolio)}
                 </span>
               )}
+            </p>
+            <p className="text-base text-white/50">
+              {dish.orderedBy && <span>· {dish.orderedBy}</span>}
             </p>
             {(() => {
               const opts = getOptions(dish.customFields);
@@ -92,7 +95,7 @@ export default function DishItem({
               ) : null;
             })()}
             {dish.specialInstructions && (
-              <p className="text-xs text-white/50 mt-0.5">
+              <p className="text-base text-white/50 mt-0.5">
                 Nota: {dish.specialInstructions}
               </p>
             )}

@@ -4,6 +4,7 @@ import type { Order, DishStatus, CookingStatus } from "../types";
 import type { Branch } from "../services/api";
 import DishItem from "./DishItem";
 import CashPaymentModal from "./CashPaymentModal";
+import { formatFolio } from "../utils/folio";
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
   tap: "Tap Order & Pay",
@@ -125,7 +126,7 @@ export default function OrderCard({
           </div>
           {order.folio != null && order.folio !== "" && (
             <span className="shrink-0 text-sm font-mono font-semibold px-2 py-0.5 rounded-full bg-white/10 text-white/60">
-              #{String(order.folio).padStart(5, "0")}
+              #{formatFolio(order.folio)}
             </span>
           )}
         </div>

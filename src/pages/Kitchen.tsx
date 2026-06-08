@@ -13,6 +13,7 @@ import OrderCarousel from "../components/OrderCarousel";
 import { deleteFcmToken } from "../services/api";
 import type { Branch } from "../services/api";
 import type { DishStatus, CookingStatus, Order } from "../types";
+import { formatFolio } from "../utils/folio";
 
 async function showWindow() {
   try {
@@ -208,7 +209,7 @@ export default function Kitchen({
           {newOrderNotifications.map((n, depth) => {
             if (depth > 2) return null;
             const folioPart =
-              n.folio != null ? `#${String(n.folio).padStart(5, "0")}` : null;
+              n.folio != null ? `#${formatFolio(n.folio)}` : null;
             const subtitle = [folioPart, n.identifier || null]
               .filter(Boolean)
               .join(" · ");

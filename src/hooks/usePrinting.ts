@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getPrinters, type PrinterRecord } from "../services/api";
+import { formatFolio } from "../utils/folio";
 
 const BRANCH_KEY = "crew_branch_id";
 const DEVICE_ID_KEY = "crew_device_id";
@@ -76,7 +77,7 @@ function buildTicket(
     `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
 
   const roleLabel = ROLE_LABEL[role] ?? "GENERAL";
-  const ordenLabel = String(folio).padStart(5, "0");
+  const ordenLabel = formatFolio(folio);
 
   buf.push(0x1b, 0x40); // Init
   buf.push(0x1b, 0x61, 0x01); // Align center

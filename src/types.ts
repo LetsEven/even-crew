@@ -76,6 +76,7 @@ export interface Order {
   createdAt: string;
   folio?: string | number | null;
   orderNotes?: string | null;
+  status?: string | null;
   totalAmount?: number | null;
   paidAmount?: number | null;
   remainingAmount?: number | null;
