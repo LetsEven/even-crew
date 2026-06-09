@@ -29,17 +29,6 @@ const ORDER_TYPE_COLORS: Record<OrderType, string> = {
   flex_bill: "bg-purple-500/20 text-purple-300",
 };
 
-const DISH_STATUS_COLORS: Record<string, string> = {
-  preparing: "text-amber-400",
-  ready: "text-blue-300",
-  delivered: "text-emerald-400",
-};
-
-const DISH_STATUS_LABELS: Record<string, string> = {
-  preparing: "Preparando",
-  ready: "Listo",
-  delivered: "Entregado",
-};
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("es-MX", {
@@ -74,6 +63,7 @@ export default function Historial({
   const [branchOpen, setBranchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const branchRef = useRef<HTMLDivElement>(null);
 
   const fetchHistory = useCallback(
     async (showSpinner = true) => {
@@ -107,6 +97,16 @@ export default function Historial({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (branchRef.current && !branchRef.current.contains(e.target as Node)) {
+        setBranchOpen(false);
+      }
+    };
+    if (branchOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [branchOpen]);
+
   return (
     <div
       className="relative min-h-screen flex flex-col"
@@ -119,7 +119,7 @@ export default function Historial({
         {/* Botón volver */}
         <button
           onClick={onBack}
-          className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -136,7 +136,7 @@ export default function Historial({
           <button
             onClick={() => fetchHistory(true)}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors text-sm disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors text-sm disabled:opacity-50 cursor-pointer disabled:cursor-default"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             Actualizar
@@ -148,10 +148,10 @@ export default function Historial({
       <div className="flex flex-col items-center pb-4 gap-1">
         <h1 className="text-white font-semibold text-xl">Historial</h1>
         {!branchesLoading && branches.length > 0 && (
-          <div className="relative">
+          <div className="relative" ref={branchRef}>
             <button
               onClick={() => setBranchOpen((v) => !v)}
-              className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/80 text-sm rounded-full px-4 py-1.5 border border-white/10 transition-colors"
+              className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/80 text-sm rounded-full px-4 py-1.5 border border-white/10 transition-colors cursor-pointer"
             >
               <span>
                 {branches.find((b) => b.id === branchId)?.name ??
@@ -172,7 +172,7 @@ export default function Historial({
                         onBranchChange(b.id);
                         setBranchOpen(false);
                       }}
-                      className="w-full flex items-center justify-between gap-4 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 transition-colors"
+                      className="w-full flex items-center justify-between gap-4 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
                     >
                       <span>{b.name}</span>
                       {b.id === branchId && (
@@ -219,7 +219,7 @@ export default function Historial({
             <p className="text-sm">{error}</p>
             <button
               onClick={() => fetchHistory(true)}
-              className="px-4 py-2 bg-white/20 text-white rounded-full text-sm font-medium hover:bg-white/30"
+              className="px-4 py-2 bg-white/20 text-white rounded-full text-sm font-medium hover:bg-white/30 cursor-pointer"
             >
               Reintentar
             </button>
@@ -233,9 +233,10 @@ export default function Historial({
         ) : (
           <div className="flex-1 overflow-y-auto space-y-3 pr-0.5">
             {orders.map((order) => {
-              const allDelivered = order.dishes.every(
-                (d) => d.status === "delivered",
-              );
+              const allDelivered =
+                order.orderType === "pick_and_go"
+                  ? order.cookingStatus === "delivered"
+                  : order.dishes.every((d) => d.status === "delivered");
               return (
                 <div
                   key={order.id}
@@ -300,11 +301,6 @@ export default function Historial({
                               #{formatFolio(dish.userFolio)}
                             </span>
                           )}
-                        </span>
-                        <span
-                          className={`text-xs font-medium shrink-0 ${DISH_STATUS_COLORS[dish.status]}`}
-                        >
-                          {DISH_STATUS_LABELS[dish.status]}
                         </span>
                       </div>
                     ))}

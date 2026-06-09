@@ -4,6 +4,7 @@ import { Mail, KeyRound, Loader2, Eye, EyeOff } from "lucide-react";
 import Kitchen from "./pages/Kitchen";
 import Printers from "./pages/Printers";
 import Historial from "./pages/Historial";
+import Mesas from "./pages/Mesas";
 import { useSocket } from "./hooks/useSocket";
 import type { CrewDevice } from "./hooks/useSocket";
 import { usePrinting } from "./hooks/usePrinting";
@@ -13,7 +14,7 @@ import type { Branch } from "./services/api";
 import type { DishStatus } from "./types";
 import { getOrCreateDeviceId } from "./utils/deviceId";
 
-type Page = "kitchen" | "printers" | "historial";
+type Page = "kitchen" | "printers" | "historial" | "mesas";
 
 async function showWindowIfNeeded() {
   try {
@@ -453,10 +454,22 @@ export default function App() {
     );
   }
 
+  if (page === "mesas") {
+    return (
+      <Mesas
+        onBack={() => setPage("kitchen")}
+        branchId={branchId}
+        branches={branches}
+        onBranchChange={handleBranchChange}
+      />
+    );
+  }
+
   return (
     <Kitchen
       onOpenPrinters={() => setPage("printers")}
       onOpenHistorial={() => setPage("historial")}
+      onOpenMesas={() => setPage("mesas")}
       orders={orders}
       loading={ordersLoading}
       error={ordersError}

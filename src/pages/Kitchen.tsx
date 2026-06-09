@@ -8,6 +8,7 @@ import {
   Check,
   Menu,
   History,
+  LayoutGrid,
 } from "lucide-react";
 import OrderCarousel from "../components/OrderCarousel";
 import { deleteFcmToken } from "../services/api";
@@ -66,6 +67,7 @@ async function requestNotificationPermission() {
 interface Props {
   onOpenPrinters: () => void;
   onOpenHistorial: () => void;
+  onOpenMesas: () => void;
   orders: Order[];
   loading: boolean;
   error: string | null;
@@ -97,6 +99,7 @@ interface Props {
 export default function Kitchen({
   onOpenPrinters,
   onOpenHistorial,
+  onOpenMesas,
   orders,
   loading,
   error,
@@ -113,6 +116,7 @@ export default function Kitchen({
   const [branchOpen, setBranchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const branchRef = useRef<HTMLDivElement>(null);
   const { signOut } = useClerk();
   const { getToken } = useAuth();
 
@@ -125,6 +129,16 @@ export default function Kitchen({
     if (menuOpen) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (branchRef.current && !branchRef.current.contains(e.target as Node)) {
+        setBranchOpen(false);
+      }
+    };
+    if (branchOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [branchOpen]);
 
   const handleSignOut = useCallback(async () => {
     try {
@@ -263,7 +277,7 @@ export default function Kitchen({
         <div ref={menuRef} className="relative">
           <button
             onClick={() => setMenuOpen((v) => !v)}
-            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition- cursor-pointer"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -274,28 +288,41 @@ export default function Kitchen({
                   onOpenPrinters();
                   setMenuOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/10 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <PrinterIcon className="w-4 h-4 shrink-0" />
                 Impresoras
               </button>
+
+              <button
+                onClick={() => {
+                  onOpenMesas();
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <LayoutGrid className="w-4 h-4 shrink-0" />
+                Mesas
+              </button>
+
               <button
                 onClick={() => {
                   onOpenHistorial();
                   setMenuOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/10 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <History className="w-4 h-4 shrink-0" />
                 Historial
               </button>
+
               <div className="h-px bg-white/10 mx-3" />
               <button
                 onClick={() => {
                   handleSignOut();
                   setMenuOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-rose-400 hover:bg-white/10 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-rose-400 hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <LogOut className="w-4 h-4 shrink-0" />
                 Cerrar sesión
@@ -315,7 +342,7 @@ export default function Kitchen({
         <button
           onClick={() => fetchOrders(true)}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors text-sm disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors text-sm disabled:opacity-50 cursor-pointer"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           Actualizar
@@ -326,10 +353,10 @@ export default function Kitchen({
       <div className="flex flex-col items-center pb-6 gap-1">
         <h1 className="text-white font-semibold text-xl">Even Crew</h1>
         {!branchesLoading && branches.length > 0 && (
-          <div className="relative">
+          <div className="relative" ref={branchRef}>
             <button
               onClick={() => setBranchOpen((v) => !v)}
-              className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/80 text-sm rounded-full px-4 py-1.5 border border-white/10 transition-colors"
+              className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/80 text-sm rounded-full px-4 py-1.5 border border-white/10 transition-colors cursor-pointer"
             >
               <span>
                 {branches.find((b) => b.id === branchId)?.name ??
@@ -350,7 +377,7 @@ export default function Kitchen({
                         onBranchChange(b.id);
                         setBranchOpen(false);
                       }}
-                      className="w-full flex items-center justify-between gap-4 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 transition-colors"
+                      className="w-full flex items-center justify-between gap-4 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
                     >
                       <span>{b.name}</span>
                       {b.id === branchId && (
@@ -410,7 +437,7 @@ export default function Kitchen({
             <p className="text-sm">{error}</p>
             <button
               onClick={() => fetchOrders(true)}
-              className="px-4 py-2 bg-white/20 text-white rounded-full text-sm font-medium hover:bg-white/30"
+              className="px-4 py-2 bg-white/20 text-white rounded-full text-sm font-medium hover:bg-white/30 cursor-pointer"
             >
               Reintentar
             </button>

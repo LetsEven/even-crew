@@ -21,6 +21,7 @@
     "@tauri-apps/plugin-autostart": "^2.5.1",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "lucide-react": "^1.8.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "socket.io-client": "^4.8.3",
