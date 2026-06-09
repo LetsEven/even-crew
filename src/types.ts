@@ -28,6 +28,8 @@ export interface Dish {
   userFolio?: string | null;
   customFields?: CustomField[] | null;
   specialInstructions?: string | null;
+  price?: number;
+  paymentStatus?: string;
 }
 
 export interface PaymentTransaction {

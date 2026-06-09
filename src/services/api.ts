@@ -222,8 +222,32 @@ export async function payDishOrderManual(
   });
 }
 
+export async function payTapPayDishOrder(
+  dishId: string,
+  guestName: string,
+  token: string,
+): Promise<void> {
+  await authFetch(`/api/tap-pay/dishes/${dishId}/pay`, token, {
+    method: "POST",
+    body: JSON.stringify({ guestName }),
+  });
+}
+
+export async function payTapPayOrderAmount(
+  orderId: string,
+  amount: number,
+  guestName: string,
+  token: string,
+): Promise<void> {
+  await authFetch(`/api/tap-pay/orders/${orderId}/pay-amount`, token, {
+    method: "POST",
+    body: JSON.stringify({ amount, guestName }),
+  });
+}
+
 export interface CreateManualTransactionParams {
-  id_table_order: string;
+  id_table_order?: string;
+  id_tap_pay_order?: string;
   restaurant_id: number;
   base_amount: number;
   tip_amount: number;
@@ -244,6 +268,117 @@ export interface CreateManualTransactionParams {
   currency?: string;
 }
 
+export interface TableRow {
+  id: string;
+  table_number: number;
+  status: "available" | "occupied" | "maintenance";
+  has_open_account: boolean;
+}
+
+export interface QRCodeRow {
+  id: string;
+  code: string;
+  table_number: number;
+  service: string;
+}
+
+export interface TableDish {
+  item: string;
+  quantity: number;
+  status: string;
+  payment_status?: string;
+}
+
+export interface TablePayment {
+  guestName: string | null;
+  baseAmount: number;
+  tipAmount: number;
+  cardType: string | null;
+}
+
+export interface TableActiveSummary {
+  service: string;
+  label: string;
+  total: number;
+  status: string;
+  folio?: string | number | null;
+  paid_amount?: number;
+  remaining_amount?: number;
+  dishes?: TableDish[];
+  payments?: TablePayment[];
+}
+
+export async function getTablesForBranch(
+  branchId: string,
+  token: string,
+): Promise<TableRow[]> {
+  const data = await authFetch(
+    `/api/kitchen/tables?branchId=${branchId}`,
+    token,
+  );
+  return data.tables ?? [];
+}
+
+export async function getQRCodesForBranch(
+  branchId: string,
+  token: string,
+): Promise<QRCodeRow[]> {
+  const data = await authFetch(
+    `/api/kitchen/branches/${branchId}/qr-codes`,
+    token,
+  );
+  return data.qrCodes ?? [];
+}
+
+export async function checkTablePOS(
+  branchId: string,
+  tableNumber: number,
+  token: string,
+): Promise<TableActiveSummary | null> {
+  const data = await authFetch(
+    `/api/kitchen/tables/${tableNumber}/pos-check?branchId=${branchId}`,
+    token,
+  );
+  return data.order ?? null;
+}
+
+export async function peekTablePOS(
+  branchId: string,
+  tableNumber: number,
+  token: string,
+): Promise<boolean> {
+  const data = await authFetch(
+    `/api/kitchen/tables/${tableNumber}/pos-peek?branchId=${branchId}`,
+    token,
+  );
+  return data.hasPOSOrder === true;
+}
+
+export async function openTableAccount(
+  branchId: string,
+  tableNumber: number,
+  token: string,
+): Promise<TableActiveSummary | null> {
+  const data = await authFetch(
+    `/api/kitchen/tables/${tableNumber}/open?branchId=${branchId}`,
+    token,
+    { method: "POST" },
+  );
+  return data.order ?? null;
+}
+
+export async function getTableActiveSummary(
+  branchId: string,
+  tableNumber: number,
+  token: string,
+): Promise<TableActiveSummary | null> {
+  const data = await authFetch(
+    `/api/kitchen/tables/${tableNumber}/summary?branchId=${branchId}`,
+    token,
+  );
+  return data.order ?? null;
+}
+
 export async function createManualTransaction(
   params: CreateManualTransactionParams,
   token: string,
@@ -253,7 +388,12 @@ export async function createManualTransaction(
     body: JSON.stringify({
       payment_method_id: null,
       restaurant_id: params.restaurant_id,
-      id_table_order: params.id_table_order,
+      ...(params.id_table_order
+        ? { id_table_order: params.id_table_order }
+        : {}),
+      ...(params.id_tap_pay_order
+        ? { id_tap_pay_order: params.id_tap_pay_order }
+        : {}),
       base_amount: params.base_amount,
       tip_amount: params.tip_amount,
       iva_tip: params.iva_tip,
@@ -286,4 +426,97 @@ export async function updatePrinter(
     body: JSON.stringify(updates),
   });
   return data.printer;
+}
+
+export interface MenuItemOption {
+  id: string;
+  name: string;
+  price: number;
+}
+
+export interface MenuItemCustomField {
+  id: string;
+  name: string;
+  type: string;
+  options?: MenuItemOption[];
+  required?: boolean;
+  maxSelections?: number;
+}
+
+export interface MenuItem {
+  id: number;
+  name: string;
+  price: number;
+  discount: number;
+  custom_fields: MenuItemCustomField[];
+  is_available: boolean;
+  is_out_of_stock?: boolean;
+  section_id: number;
+}
+
+export interface MenuSection {
+  id: number;
+  name: string;
+  is_active: boolean;
+  display_order: number;
+  items: MenuItem[];
+}
+
+export interface AddDishParams {
+  restaurantId: number;
+  branchNumber: number;
+  tableNumber: number;
+  item: string;
+  quantity: number;
+  price: number;
+  customFields: Array<{
+    fieldId: string;
+    fieldName: string;
+    fieldType: string;
+    selectedOptions: Array<{
+      optionId: string;
+      optionName: string;
+      price: number;
+      quantity: number;
+    }>;
+  }>;
+  extraPrice: number;
+  menuItemId: number;
+  specialInstructions: string | null;
+  guestName: string;
+}
+
+export async function getRestaurantMenu(
+  restaurantId: number,
+  branchNumber: number,
+  token: string,
+): Promise<MenuSection[]> {
+  const data = await authFetch(
+    `/api/restaurants/${restaurantId}/${branchNumber}/complete`,
+    token,
+  );
+  return data.data?.menu ?? [];
+}
+
+export async function addDishToFlexBill(
+  params: AddDishParams,
+  token: string,
+): Promise<void> {
+  await authFetch(
+    `/api/restaurants/${params.restaurantId}/branches/${params.branchNumber}/tables/${params.tableNumber}/dishes`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        item: params.item,
+        quantity: params.quantity,
+        price: params.price,
+        customFields: params.customFields,
+        extraPrice: params.extraPrice,
+        menuItemId: params.menuItemId,
+        specialInstructions: params.specialInstructions,
+        guestName: params.guestName,
+      }),
+    },
+  );
 }
