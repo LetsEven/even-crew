@@ -118,7 +118,7 @@ export default function DishItem({
               key={s}
               onClick={() => onStatusChange(dish.id, s)}
               disabled={dish.status === s}
-              className={`flex-1 py-1 text-sm rounded-full font-medium border transition-all active:scale-95 ${
+              className={`flex-1 py-1 text-sm rounded-full font-medium border transition-all active:scale-95 cursor-pointer disabled:cursor-default ${
                 dish.status === s
                   ? BUTTON_ACTIVE[s]
                   : "bg-transparent text-white/50 border-white/20 hover:border-white/40"

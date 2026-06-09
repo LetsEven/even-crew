@@ -50,7 +50,7 @@ export default function OrderCarousel({
         <button
           onClick={prev}
           disabled={safeIndex === 0}
-          className="p-2 rounded-xl bg-white/10 disabled:opacity-20 active:scale-95 transition-all"
+          className="p-2 rounded-xl bg-white/10 disabled:opacity-20 active:scale-95 transition-all cursor-pointer"
         >
           <ChevronLeft className="w-5 h-5 text-white" />
         </button>
@@ -64,7 +64,7 @@ export default function OrderCarousel({
               <button
                 key={i}
                 onClick={() => setIndex(i)}
-                className={`h-2 rounded-full transition-all ${
+                className={`h-2 rounded-full transition-all cursor-pointer ${
                   i === safeIndex ? "bg-white w-5" : "bg-white/30 w-2"
                 }`}
               />
@@ -75,7 +75,7 @@ export default function OrderCarousel({
         <button
           onClick={next}
           disabled={safeIndex === orders.length - 1}
-          className="p-2 rounded-xl bg-white/10 disabled:opacity-20 active:scale-95 transition-all"
+          className="p-2 rounded-xl bg-white/10 disabled:opacity-20 active:scale-95 transition-all cursor-pointer"
         >
           <ChevronRight className="w-5 h-5 text-white" />
         </button>

@@ -1,9 +1,10 @@
 import { useState, Fragment } from "react";
-import { Banknote } from "lucide-react";
+import { Banknote, Plus } from "lucide-react";
 import type { Order, DishStatus, CookingStatus } from "../types";
 import type { Branch } from "../services/api";
 import DishItem from "./DishItem";
 import CashPaymentModal from "./CashPaymentModal";
+import AddDishModal from "./AddDishModal";
 import { formatFolio } from "../utils/folio";
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
@@ -92,9 +93,11 @@ export default function OrderCard({
   const total = order.dishes.length;
   const currentCookingStatus = order.cookingStatus ?? "preparing";
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showAddDish, setShowAddDish] = useState(false);
 
+  const canAddDish = order.orderType === "flex_bill" && currentBranch != null;
   const canRegisterPayment =
-    order.orderType === "flex_bill" &&
+    (order.orderType === "flex_bill" || order.orderType === "tap_pay") &&
     (order.remainingAmount ?? 0) > 0 &&
     currentBranch != null;
 
@@ -169,7 +172,7 @@ export default function OrderCard({
                 key={s}
                 onClick={() => onOrderCookingStatusChange?.(order.id, s)}
                 disabled={currentCookingStatus === s}
-                className={`flex-1 py-1 text-sm rounded-full font-medium border transition-all active:scale-95 ${
+                className={`flex-1 py-1 text-sm rounded-full font-medium border transition-all active:scale-95 cursor-pointer disabled:cursor-default ${
                   currentCookingStatus === s
                     ? COOKING_BUTTON_ACTIVE[s]
                     : "bg-transparent text-white/50 border-white/20 hover:border-white/40"
@@ -182,42 +185,42 @@ export default function OrderCard({
         </div>
       )}
 
-      {/* Pagos flex_bill */}
-      {order.orderType === "flex_bill" &&
+      {/* Pagos flex_bill / tap_pay */}
+      {(order.orderType === "flex_bill" || order.orderType === "tap_pay") &&
         (order.totalAmount != null ||
           order.paidAmount != null ||
           (order.payments?.length ?? 0) > 0 ||
-          canRegisterPayment) && (
+          canRegisterPayment ||
+          canAddDish) && (
           <div className="px-5 pb-5 pt-2 border-t border-white/10 flex flex-col gap-2">
-            {order.orderType === "flex_bill" &&
-              (order.totalAmount != null || order.paidAmount != null) && (
-                <div className="flex gap-3">
-                  <div className="flex flex-col items-center flex-1">
-                    <span className="text-xs text-white/40">Total</span>
-                    <span className="text-sm font-semibold text-white">
-                      ${(order.totalAmount ?? 0).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-center flex-1">
-                    <span className="text-xs text-white/40">Pagado</span>
-                    <span className="text-sm font-semibold text-emerald-400">
-                      ${(order.paidAmount ?? 0).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-center flex-1">
-                    <span className="text-xs text-white/40">Restante</span>
-                    <span
-                      className={`text-sm font-semibold ${
-                        (order.remainingAmount ?? 0) > 0
-                          ? "text-amber-400"
-                          : "text-emerald-400"
-                      }`}
-                    >
-                      ${(order.remainingAmount ?? 0).toFixed(2)}
-                    </span>
-                  </div>
+            {(order.totalAmount != null || order.paidAmount != null) && (
+              <div className="flex gap-3">
+                <div className="flex flex-col items-center flex-1">
+                  <span className="text-xs text-white/40">Total</span>
+                  <span className="text-sm font-semibold text-white">
+                    ${(order.totalAmount ?? 0).toFixed(2)}
+                  </span>
                 </div>
-              )}
+                <div className="flex flex-col items-center flex-1">
+                  <span className="text-xs text-white/40">Pagado</span>
+                  <span className="text-sm font-semibold text-emerald-400">
+                    ${(order.paidAmount ?? 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center flex-1">
+                  <span className="text-xs text-white/40">Restante</span>
+                  <span
+                    className={`text-sm font-semibold ${
+                      (order.remainingAmount ?? 0) > 0
+                        ? "text-amber-400"
+                        : "text-emerald-400"
+                    }`}
+                  >
+                    ${(order.remainingAmount ?? 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
             {(order.payments?.length ?? 0) > 0 && (
               <div className="border-t border-white/10 pt-2 grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-3 items-center">
                 <span className="text-[10px] uppercase text-white/30 font-medium pb-1">
@@ -257,10 +260,19 @@ export default function OrderCard({
               </div>
             )}
 
+            {canAddDish && (
+              <button
+                onClick={() => setShowAddDish(true)}
+                className="mt-1 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-teal-500/15 border border-teal-500/30 text-teal-400 text-sm font-medium hover:bg-teal-500/25 transition-colors active:scale-[0.98] cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                Agregar platillo
+              </button>
+            )}
             {canRegisterPayment && (
               <button
                 onClick={() => setShowPaymentModal(true)}
-                className="mt-1 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-sm font-medium hover:bg-emerald-500/25 transition-colors active:scale-[0.98]"
+                className="mt-1 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-sm font-medium hover:bg-emerald-500/25 transition-colors active:scale-[0.98] cursor-pointer"
               >
                 <Banknote className="w-4 h-4" />
                 Registrar pago
@@ -276,6 +288,17 @@ export default function OrderCard({
           onClose={() => setShowPaymentModal(false)}
           onSuccess={() => {
             setShowPaymentModal(false);
+            onPaymentRegistered?.();
+          }}
+        />
+      )}
+      {showAddDish && currentBranch && (
+        <AddDishModal
+          order={order}
+          branch={currentBranch}
+          onClose={() => setShowAddDish(false)}
+          onSuccess={() => {
+            setShowAddDish(false);
             onPaymentRegistered?.();
           }}
         />
