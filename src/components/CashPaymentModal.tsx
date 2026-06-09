@@ -21,6 +21,8 @@ import {
   getDishOrders,
   payTableManual,
   payDishOrderManual,
+  payTapPayOrderAmount,
+  payTapPayDishOrder,
   createManualTransaction,
 } from "../services/api";
 import { calculateCommissions } from "../utils/commissionCalculator";
@@ -76,10 +78,12 @@ export default function CashPaymentModal({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const isTapPay = order.orderType === "tap_pay";
   const tableNumber = parseTableNumber(order.identifier);
 
-  // Load table summary when step 0 opens
+  // Load table summary when step 0 opens (flex_bill only)
   useEffect(() => {
+    if (isTapPay) return;
     if (step === 0 && tableNumber != null && !tableSummary) {
       setLoadingData(true);
       getToken().then(async (token) => {
@@ -103,29 +107,42 @@ export default function CashPaymentModal({
 
   // Load dish orders when select-items is chosen
   useEffect(() => {
-    if (
-      payType === "select-items" &&
-      tableNumber != null &&
-      dishOrders.length === 0
-    ) {
-      setLoadingData(true);
-      getToken().then(async (token) => {
-        if (!token) return;
-        try {
-          const dishes = await getDishOrders(
-            String(branch.restaurant_id),
-            String(branch.branch_number),
-            String(tableNumber),
-            token,
-          );
-          setDishOrders(dishes.filter((d) => d.payment_status === "not_paid"));
-        } catch (e: any) {
-          console.error("Error loading dishes:", e.message);
-        } finally {
-          setLoadingData(false);
-        }
-      });
+    if (payType !== "select-items" || dishOrders.length > 0) return;
+
+    if (isTapPay) {
+      const unpaid = order.dishes
+        .filter((d) => d.paymentStatus !== "paid")
+        .map((d) => ({
+          dish_order_id: d.id,
+          item: d.item,
+          quantity: d.quantity,
+          price: d.price ?? 0,
+          total_price: (d.price ?? 0) * d.quantity,
+          payment_status: "not_paid" as const,
+          guest_name: "",
+        }));
+      setDishOrders(unpaid);
+      return;
     }
+
+    if (tableNumber == null) return;
+    setLoadingData(true);
+    getToken().then(async (token) => {
+      if (!token) return;
+      try {
+        const dishes = await getDishOrders(
+          String(branch.restaurant_id),
+          String(branch.branch_number),
+          String(tableNumber),
+          token,
+        );
+        setDishOrders(dishes.filter((d) => d.payment_status === "not_paid"));
+      } catch (e: any) {
+        console.error("Error loading dishes:", e.message);
+      } finally {
+        setLoadingData(false);
+      }
+    });
   }, [payType]);
 
   // Derived amounts
@@ -182,7 +199,9 @@ export default function CashPaymentModal({
       const manualRef = method === "terminal" ? terminalRef.trim() : null;
 
       const txParams = {
-        id_table_order: order.id,
+        ...(isTapPay
+          ? { id_tap_pay_order: order.id }
+          : { id_table_order: order.id }),
         restaurant_id: branch.restaurant_id,
         base_amount: baseAmount,
         tip_amount: tipAmount,
@@ -202,7 +221,18 @@ export default function CashPaymentModal({
         manual_reference: manualRef,
       };
 
-      if (payType === "select-items") {
+      if (isTapPay && payType === "select-items") {
+        for (const dishId of selectedDishes) {
+          await payTapPayDishOrder(dishId, cobradoPor.trim(), token);
+        }
+      } else if (isTapPay) {
+        await payTapPayOrderAmount(
+          order.id,
+          baseAmount,
+          cobradoPor.trim(),
+          token,
+        );
+      } else if (payType === "select-items") {
         for (const dishId of selectedDishes) {
           await payDishOrderManual(
             dishId,
@@ -236,50 +266,63 @@ export default function CashPaymentModal({
     }
   }
 
+  const inputClass =
+    "w-full rounded-2xl border border-white/8 px-4 py-3 text-sm text-white/80 placeholder-white/20 focus:outline-none focus:border-white/20";
+  const inputStyle = { background: "rgba(255,255,255,0.04)" };
+  const cardClass = "rounded-2xl border border-white/8 px-4 py-4";
+  const cardStyle = { background: "rgba(255,255,255,0.04)" };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div
-        className="w-full max-w-md rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col"
-        style={{ background: "#0a3238", maxHeight: "90vh" }}
+        className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col border border-white/10 shadow-2xl"
+        style={{ background: "#071e22", maxHeight: "90vh" }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/10">
+        <div
+          className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/8 shrink-0"
+          style={{ background: "rgba(255,255,255,0.03)" }}
+        >
           <div>
-            <h2 className="text-white font-semibold text-lg">Registrar pago</h2>
-            <p className="text-xs text-white/40 mt-0.5">
+            <p className="text-white/40 text-xs uppercase tracking-widest mb-0.5">
+              {order.identifier}
+            </p>
+            <h2 className="text-white font-bold text-xl leading-none">
+              Registrar pago
+            </h2>
+            <p className="text-xs text-white/30 mt-0.5">
               {STEP_LABELS[step]} · {step + 1}/{STEP_LABELS.length}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 rounded-full text-white/30 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-5 py-5 flex flex-col gap-5">
-          {/* Mesa info */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-white/50">{order.identifier}</span>
-            <span className="text-white/50">
-              Restante:{" "}
-              <span className="text-amber-400 font-semibold">
-                ${(order.remainingAmount ?? 0).toFixed(2)}
-              </span>
-            </span>
-          </div>
-
+        <div className="overflow-y-auto flex-1 px-5 py-5 flex flex-col gap-4">
           {/* ── Step 0: Tipo de cobro ── */}
           {step === 0 && (
-            <div className="flex flex-col gap-4">
+            <>
               {loadingData && !tableSummary ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="w-6 h-6 text-white/40 animate-spin" />
                 </div>
               ) : (
                 <>
-                  <div className="flex flex-col gap-2">
+                  <div
+                    className="rounded-2xl border border-white/8 overflow-hidden"
+                    style={{ background: "rgba(255,255,255,0.03)" }}
+                  >
                     {(
                       [
                         {
@@ -307,32 +350,29 @@ export default function CashPaymentModal({
                         label: string;
                         desc: string;
                       }[]
-                    ).map(({ type, label, desc }) => (
+                    ).map(({ type, label, desc }, idx) => (
                       <button
                         key={type}
                         onClick={() => setPayType(type)}
-                        className={`flex items-center justify-between px-4 py-3.5 rounded-xl border transition-all ${
-                          payType === type
-                            ? "border-emerald-400 bg-emerald-400/10"
-                            : "border-white/10 bg-white/5 hover:bg-white/10"
-                        }`}
+                        className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors cursor-pointer ${
+                          idx > 0 ? "border-t border-white/8" : ""
+                        } ${payType === type ? "bg-emerald-500/10" : "hover:bg-white/5"}`}
                       >
-                        <div className="text-left">
+                        <div>
                           <p
-                            className={`text-sm font-medium ${payType === type ? "text-emerald-400" : "text-white"}`}
+                            className={`text-sm font-medium ${payType === type ? "text-emerald-400" : "text-white/80"}`}
                           >
                             {label}
                           </p>
-                          <p className="text-xs text-white/40 mt-0.5">{desc}</p>
+                          <p className="text-xs text-white/30 mt-0.5">{desc}</p>
                         </div>
                         {payType === type && (
-                          <Check className="w-4 h-4 text-emerald-400" />
+                          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                         )}
                       </button>
                     ))}
                   </div>
 
-                  {/* Extra inputs per type */}
                   {payType === "select-items" && (
                     <div className="flex flex-col gap-2">
                       {loadingData ? (
@@ -340,43 +380,48 @@ export default function CashPaymentModal({
                           <Loader2 className="w-5 h-5 text-white/40 animate-spin" />
                         </div>
                       ) : dishOrders.length === 0 ? (
-                        <p className="text-sm text-white/40 text-center py-3">
+                        <p className="text-sm text-white/30 text-center py-3">
                           Sin platillos pendientes
                         </p>
                       ) : (
-                        dishOrders.map((dish) => (
-                          <button
-                            key={dish.dish_order_id}
-                            onClick={() =>
-                              setSelectedDishes((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(dish.dish_order_id))
-                                  next.delete(dish.dish_order_id);
-                                else next.add(dish.dish_order_id);
-                                return next;
-                              })
-                            }
-                            className={`flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all ${
-                              selectedDishes.has(dish.dish_order_id)
-                                ? "border-emerald-400 bg-emerald-400/10"
-                                : "border-white/10 bg-white/5"
-                            }`}
-                          >
-                            <span className="text-sm text-white">
-                              {dish.quantity}x {dish.item}
-                            </span>
-                            <span className="text-sm text-emerald-400 font-medium">
-                              ${dish.total_price.toFixed(2)}
-                            </span>
-                          </button>
-                        ))
+                        <div
+                          className="rounded-2xl border border-white/8 overflow-hidden"
+                          style={{ background: "rgba(255,255,255,0.03)" }}
+                        >
+                          {dishOrders.map((dish, idx) => (
+                            <button
+                              key={dish.dish_order_id}
+                              onClick={() =>
+                                setSelectedDishes((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(dish.dish_order_id))
+                                    next.delete(dish.dish_order_id);
+                                  else next.add(dish.dish_order_id);
+                                  return next;
+                                })
+                              }
+                              className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors cursor-pointer ${
+                                idx > 0 ? "border-t border-white/8" : ""
+                              } ${selectedDishes.has(dish.dish_order_id) ? "bg-emerald-500/10" : "hover:bg-white/5"}`}
+                            >
+                              <span
+                                className={`text-sm ${selectedDishes.has(dish.dish_order_id) ? "text-white" : "text-white/70"}`}
+                              >
+                                {dish.quantity}× {dish.item}
+                              </span>
+                              <span className="text-sm text-emerald-400 font-medium shrink-0 ml-2">
+                                ${dish.total_price.toFixed(2)}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
                       )}
                     </div>
                   )}
 
                   {payType === "equal-shares" && (
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-white/50">
+                      <label className="text-xs uppercase tracking-widest text-white/30 font-medium">
                         Número de personas
                       </label>
                       <input
@@ -384,10 +429,11 @@ export default function CashPaymentModal({
                         min="2"
                         value={equalPeople}
                         onChange={(e) => setEqualPeople(e.target.value)}
-                        className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                        className={inputClass}
+                        style={inputStyle}
                       />
                       {parseInt(equalPeople) > 1 && (
-                        <p className="text-xs text-white/40">
+                        <p className="text-xs text-white/30">
                           Corresponde $
                           {(remaining / (parseInt(equalPeople) || 2)).toFixed(
                             2,
@@ -400,7 +446,7 @@ export default function CashPaymentModal({
 
                   {payType === "choose-amount" && (
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-white/50">
+                      <label className="text-xs uppercase tracking-widest text-white/30 font-medium">
                         Monto a cobrar
                       </label>
                       <input
@@ -410,18 +456,19 @@ export default function CashPaymentModal({
                         value={customAmount}
                         onChange={(e) => setCustomAmount(e.target.value)}
                         placeholder="0.00"
-                        className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm focus:outline-none focus:border-emerald-400/60"
+                        className={inputClass}
+                        style={inputStyle}
                       />
                     </div>
                   )}
                 </>
               )}
-            </div>
+            </>
           )}
 
           {/* ── Step 1: Propina ── */}
           {step === 1 && (
-            <div className="flex flex-col gap-4">
+            <>
               <div className="flex gap-2 flex-wrap">
                 {TIP_OPTIONS.map((pct) => (
                   <button
@@ -431,22 +478,32 @@ export default function CashPaymentModal({
                       setShowCustomTip(false);
                       setCustomTip("");
                     }}
-                    className={`flex-1 min-w-[16 py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                    className={`flex-1 min-w-16 py-2.5 rounded-2xl text-sm font-medium border transition-all cursor-pointer ${
                       !showCustomTip && tipPct === pct
-                        ? "border-emerald-400 bg-emerald-400/10 text-emerald-400"
-                        : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                        : "border-white/8 text-white/50 hover:bg-white/5"
                     }`}
+                    style={
+                      !showCustomTip && tipPct === pct
+                        ? {}
+                        : { background: "rgba(255,255,255,0.03)" }
+                    }
                   >
                     {pct === 0 ? "Sin propina" : `${pct}%`}
                   </button>
                 ))}
                 <button
                   onClick={() => setShowCustomTip(true)}
-                  className={`flex-1 min-w-16 py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                  className={`flex-1 min-w-16 py-2.5 rounded-2xl text-sm font-medium border transition-all cursor-pointer ${
                     showCustomTip
-                      ? "border-emerald-400 bg-emerald-400/10 text-emerald-400"
-                      : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                      : "border-white/8 text-white/50 hover:bg-white/5"
                   }`}
+                  style={
+                    showCustomTip
+                      ? {}
+                      : { background: "rgba(255,255,255,0.03)" }
+                  }
                 >
                   Otro
                 </button>
@@ -454,7 +511,7 @@ export default function CashPaymentModal({
 
               {showCustomTip && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-white/50">
+                  <label className="text-xs uppercase tracking-widest text-white/30 font-medium">
                     Monto de propina
                   </label>
                   <input
@@ -464,54 +521,71 @@ export default function CashPaymentModal({
                     value={customTip}
                     onChange={(e) => setCustomTip(e.target.value)}
                     placeholder="0.00"
-                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm focus:outline-none focus:border-emerald-400/60"
+                    className={inputClass}
+                    style={inputStyle}
                   />
                 </div>
               )}
 
-              {/* Desglose */}
-              <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white/5 border border-white/10">
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/50">Subtotal</span>
-                  <span className="text-white">${baseAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/50">Propina</span>
-                  <span className="text-white">+${tipAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/50">Comisión Even</span>
-                  <span className="text-white">
-                    +${commissions.evenClientCharge.toFixed(2)}
-                  </span>
-                </div>
-                <div className="h-px bg-white/10 my-1" />
-                <div className="flex justify-between text-sm font-semibold">
-                  <span className="text-white">Total a cobrar</span>
-                  <span className="text-white text-base">
-                    ${totalAmount.toFixed(2)}
-                  </span>
+              <div className={cardClass} style={cardStyle}>
+                <p className="text-xs uppercase tracking-widest text-white/25 font-medium mb-3">
+                  Desglose
+                </p>
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-white/50">Subtotal</span>
+                    <span className="text-white/80">
+                      ${baseAmount.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-white/50">Propina</span>
+                    <span className="text-white/80">
+                      +${tipAmount.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-white/50">Comisión Even</span>
+                    <span className="text-white/80">
+                      +${commissions.evenClientCharge.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="h-px bg-white/8 my-1" />
+                  <div className="flex justify-between text-sm font-semibold">
+                    <span className="text-white">Total a cobrar</span>
+                    <span className="text-white text-base">
+                      ${totalAmount.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* ── Step 2: Método + Confirmación ── */}
           {step === 2 && (
-            <div className="flex flex-col gap-4">
-              {/* Total destacado */}
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
-                <p className="text-xs text-emerald-400/70 mb-0.5">
+            <>
+              {/* Total */}
+              <div
+                className={`${cardClass} text-center`}
+                style={{
+                  background: "rgba(52,211,153,0.08)",
+                  borderColor: "rgba(52,211,153,0.2)",
+                }}
+              >
+                <p className="text-xs uppercase tracking-widest text-emerald-400/60 font-medium mb-1">
                   Total a cobrar
                 </p>
-                <p className="text-2xl font-bold text-emerald-400">
+                <p className="text-3xl font-bold text-emerald-400">
                   ${totalAmount.toFixed(2)}
                 </p>
               </div>
 
               {/* Método */}
               <div className="flex flex-col gap-2">
-                <p className="text-xs text-white/50">Método de pago</p>
+                <p className="text-xs uppercase tracking-widest text-white/30 font-medium">
+                  Método de pago
+                </p>
                 <div className="flex gap-3">
                   {(["cash", "terminal"] as ManualPaymentMethod[]).map((m) => (
                     <button
@@ -520,16 +594,21 @@ export default function CashPaymentModal({
                         setMethod(m);
                         setTerminalRef("");
                       }}
-                      className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${
+                      className={`flex-1 flex flex-col items-center gap-2 py-4 rounded-2xl border transition-all cursor-pointer ${
                         method === m
-                          ? "border-emerald-400 bg-emerald-400/10 text-emerald-400"
-                          : "border-white/10 bg-white/5 text-white/50 hover:bg-white/10"
+                          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                          : "border-white/8 text-white/40 hover:bg-white/5"
                       }`}
+                      style={
+                        method !== m
+                          ? { background: "rgba(255,255,255,0.03)" }
+                          : {}
+                      }
                     >
                       {m === "cash" ? (
-                        <Banknote className="w-6 h-6" />
+                        <Banknote className="w-5 h-5" />
                       ) : (
-                        <CreditCard className="w-6 h-6" />
+                        <CreditCard className="w-5 h-5" />
                       )}
                       <span className="text-sm font-medium">
                         {m === "cash" ? "Efectivo" : "Terminal"}
@@ -539,10 +618,9 @@ export default function CashPaymentModal({
                 </div>
               </div>
 
-              {/* Referencia terminal */}
               {method === "terminal" && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-white/50">
+                  <label className="text-xs uppercase tracking-widest text-white/30 font-medium">
                     Número de referencia *
                   </label>
                   <input
@@ -550,40 +628,43 @@ export default function CashPaymentModal({
                     value={terminalRef}
                     onChange={(e) => setTerminalRef(e.target.value)}
                     placeholder="Ej. REF-001234"
-                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm focus:outline-none focus:border-emerald-400/60"
+                    className={inputClass}
+                    style={inputStyle}
                     autoFocus
                   />
                 </div>
               )}
 
-              {/* Cobrado por */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs text-white/50">Cobrado por</label>
+                <label className="text-xs uppercase tracking-widest text-white/30 font-medium">
+                  Cobrado por
+                </label>
                 <input
                   type="text"
                   value={cobradoPor}
                   onChange={(e) => setCobradoPor(e.target.value)}
                   placeholder="Nombre del mesero"
-                  className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm focus:outline-none focus:border-emerald-400/60"
+                  className={inputClass}
+                  style={inputStyle}
                 />
               </div>
 
               {submitError && (
-                <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-xl px-4 py-3">
+                <p className="text-sm text-rose-400 bg-rose-500/10 border border-rose-400/20 rounded-2xl px-4 py-3 text-center">
                   {submitError}
                 </p>
               )}
-            </div>
+            </>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-5 pb-6 pt-3 border-t border-white/10 flex gap-3">
+        <div className="px-5 pb-6 pt-3 border-t border-white/8 shrink-0 flex gap-3">
           {step > 0 && (
             <button
               onClick={() => setStep((s) => s - 1)}
               disabled={submitting}
-              className="px-5 py-3 rounded-2xl border border-white/10 text-white/60 text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-40"
+              className="px-5 py-3 rounded-2xl border border-white/15 text-white/60 text-sm font-medium hover:bg-white/5 transition-colors disabled:opacity-40 cursor-pointer"
             >
               Atrás
             </button>
@@ -593,7 +674,7 @@ export default function CashPaymentModal({
             <button
               onClick={() => setStep((s) => s + 1)}
               disabled={step === 0 && !canProceedStep0()}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-500 text-white text-sm font-semibold disabled:opacity-40 hover:bg-emerald-400 transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-default"
             >
               Continuar
               <ChevronRight className="w-4 h-4" />
@@ -602,7 +683,7 @@ export default function CashPaymentModal({
             <button
               onClick={handleConfirm}
               disabled={!canConfirm() || submitting}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-500 text-white text-sm font-semibold disabled:opacity-40 hover:bg-emerald-400 transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-default"
             >
               {submitting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
