@@ -26,7 +26,11 @@ interface UseSocketProps {
     devices: CrewDevice[],
     masterDeviceId: string | null,
   ) => void;
-  onFlexbillOrder?: (data: { folio: string | null; orderedBy: string | null; identifier: string | null }) => void;
+  onFlexbillOrder?: (data: {
+    folio: string | null;
+    orderedBy: string | null;
+    identifier: string | null;
+  }) => void;
 }
 
 export function useSocket({
@@ -90,7 +94,8 @@ export function useSocket({
       auth: { branchId, secret: CREW_SECRET, clientType: "crew", deviceId },
       transports: ["websocket"],
       reconnection: true,
-      reconnectionDelay: 2000,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
 
     socketRef.current = socket;
