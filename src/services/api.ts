@@ -452,6 +452,15 @@ export async function updatePrinter(
   return data.printer;
 }
 
+export async function deletePrinter(
+  token: string,
+  printerId: string,
+): Promise<void> {
+  await authFetch(`/api/kitchen/printers/${printerId}`, token, {
+    method: "DELETE",
+  });
+}
+
 export interface MenuItemOption {
   id: string;
   name: string;
