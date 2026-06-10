@@ -47,12 +47,58 @@ function encodeText(text: string): number[] {
   return bytes;
 }
 
-const ROLE_LABEL: Record<string, string> = {
-  bar: "BARRA",
-  kitchen: "COCINA",
-  other: "OTROS",
-  all: "GENERAL",
-};
+let cachedLogoBytes: number[] | null = null;
+
+async function getLogoBytes(): Promise<number[]> {
+  if (cachedLogoBytes !== null) return cachedLogoBytes;
+  try {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject();
+      img.src = "/logo-even-print.png";
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    const { data, width, height } = ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+    const bytesPerRow = Math.ceil(width / 8);
+    const bitmap: number[] = [];
+    for (let y = 0; y < height; y++) {
+      for (let bx = 0; bx < bytesPerRow; bx++) {
+        let byte = 0;
+        for (let bit = 0; bit < 8; bit++) {
+          const x = bx * 8 + bit;
+          if (x < width) {
+            const idx = (y * width + x) * 4;
+            const luma =
+              0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+            if (luma < 128) byte |= 1 << (7 - bit);
+          }
+        }
+        bitmap.push(byte);
+      }
+    }
+    const xL = bytesPerRow & 0xff;
+    const xH = (bytesPerRow >> 8) & 0xff;
+    const yL = height & 0xff;
+    const yH = (height >> 8) & 0xff;
+    cachedLogoBytes = [0x1d, 0x76, 0x30, 0x00, xL, xH, yL, yH, ...bitmap];
+    return cachedLogoBytes;
+  } catch {
+    cachedLogoBytes = [];
+    return [];
+  }
+}
 
 type TicketItem = {
   name: string;
@@ -66,7 +112,6 @@ type TicketItem = {
 function buildTicket(
   items: TicketItem[],
   identifier: string,
-  role: string,
   folio: string | number,
   orderedBy?: string | null,
 ): number[] {
@@ -76,20 +121,20 @@ function buildTicket(
     `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ` +
     `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
 
-  const roleLabel = ROLE_LABEL[role] ?? "GENERAL";
   const ordenLabel = formatFolio(folio);
 
   buf.push(0x1b, 0x40); // Init
   buf.push(0x1b, 0x61, 0x01); // Align center
   buf.push(0x1b, 0x21, 0x30); // Double size
-  buf.push(...encodeText("\n== CUENTA NUEVA ==\n"));
-  buf.push(...encodeText(`== ${ordenLabel} ==\n`));
+  const num = identifier.match(/\d+/)?.[0];
+  buf.push(
+    ...encodeText(`MESA ${num ? String(num).padStart(2, "0") : identifier}\n`),
+  );
   if (orderedBy) {
     buf.push(...encodeText(`${orderedBy.toUpperCase()}\n`));
   }
   buf.push(0x1b, 0x61, 0x00); // Align left
-  buf.push(0x1b, 0x21, 0x10); // Double width
-  const num = identifier.match(/\d+/)?.[0];
+  buf.push(0x1b, 0x21, 0x00); // Normal size
   let mesaLine: string;
   if (/habitaci/i.test(identifier) || /cuarto/i.test(identifier)) {
     mesaLine = `HABITACION: ${num || identifier} MESERO: EVEN\n\n`;
@@ -98,7 +143,7 @@ function buildTicket(
   } else {
     mesaLine = `MESA: ${num ? String(num).padStart(2, "0") : identifier} MESERO: EVEN\n\n`;
   }
-  buf.push(...encodeText(`\n${roleLabel} ORDEN: ${ordenLabel}\n`));
+  buf.push(...encodeText(`\nNÚMERO DE ORDEN: ${ordenLabel}\n`));
   buf.push(...encodeText(`${fecha}\n`));
   buf.push(...encodeText(mesaLine));
   buf.push(...encodeText("========================\n"));
@@ -120,11 +165,11 @@ function buildTicket(
   return buf;
 }
 
-function buildPriceTicket(
+async function buildPriceTicket(
   dishes: { item: string; quantity: number; price?: number }[],
   identifier: string,
   qrUrl: string | null,
-): number[] {
+): Promise<number[]> {
   const WIDTH = 32;
   const buf: number[] = [];
   const now = new Date();
@@ -136,6 +181,13 @@ function buildPriceTicket(
 
   buf.push(0x1b, 0x40); // Init
   buf.push(0x1b, 0x61, 0x01); // Center
+
+  const logoBytes = await getLogoBytes();
+  if (logoBytes.length > 0) {
+    buf.push(...logoBytes);
+    buf.push(0x0a); // blank line after logo
+  }
+
   buf.push(0x1b, 0x21, 0x30); // Double size
   buf.push(...encodeText(`${mesaLabel}\n`));
   buf.push(0x1b, 0x21, 0x00); // Normal
@@ -159,7 +211,7 @@ function buildPriceTicket(
   buf.push(...encodeText("================================\n"));
   buf.push(0x1b, 0x45, 0x01); // Bold on
   const totalStr = `$${total.toFixed(2)}`;
-  const totalLabel = "TOTAL:";
+  const totalLabel = "SUBTOTAL:";
   buf.push(
     ...encodeText(
       `${totalLabel}${" ".repeat(WIDTH - totalLabel.length - totalStr.length)}${totalStr}\n`,
@@ -177,7 +229,7 @@ function buildPriceTicket(
     const pH = (dataLen >> 8) & 0xff;
 
     buf.push(0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00); // Model 2
-    buf.push(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 0x06); // Module size 6
+    buf.push(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 0x08); // Module size 8
     buf.push(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x33); // Error correction H
     buf.push(0x1d, 0x28, 0x6b, pL, pH, 0x31, 0x50, 0x30, ...urlBytes); // Store data
     buf.push(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30); // Print QR
@@ -199,7 +251,7 @@ export async function printTapPayTicket(
   const active = allPrinters.filter((p) => p.is_active !== false && p.role);
   if (active.length === 0) throw new Error("No hay impresoras configuradas");
 
-  const ticket = buildPriceTicket(dishes, identifier, qrUrl);
+  const ticket = await buildPriceTicket(dishes, identifier, qrUrl);
 
   for (const printer of active) {
     if (printer.connection_type === "usb" && printer.usb_device_name) {
@@ -283,7 +335,6 @@ export function usePrinting() {
       const ticket = buildTicket(
         printerItems,
         data.orderInfo.identifier,
-        printer.role,
         data.orderInfo.folio ?? "",
         data.orderInfo.orderedBy,
       );
