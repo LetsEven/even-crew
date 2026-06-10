@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { X, Minus, Plus, ChevronRight } from "lucide-react";
 import { useAuth } from "@clerk/clerk-react";
 import type { Order } from "../types";
@@ -273,7 +274,7 @@ export default function AddDishModal({
     "Confirmar",
   ];
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
@@ -744,6 +745,7 @@ export default function AddDishModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

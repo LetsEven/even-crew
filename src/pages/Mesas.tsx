@@ -8,7 +8,6 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-import { formatFolio } from "../utils/folio";
 import { QRCodeSVG } from "qrcode.react";
 import {
   getTablesForBranch,
@@ -39,11 +38,15 @@ function formatMXN(amount: number) {
   }).format(amount);
 }
 
-function circleClass(table: TableRow): string {
+function circleClass(table: TableRow, hasPOS: boolean): string {
   if (table.status === "maintenance")
     return "bg-white/5 border border-white/10 text-white/20 cursor-default";
+  if (table.has_tap_pay_account)
+    return "bg-white border border-white/80 text-[#0a3238] shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:bg-white/90 active:scale-90";
   if (table.has_open_account)
     return "bg-emerald-500 border border-emerald-400/60 text-white shadow-[0_0_20px_rgba(52,211,153,0.45)] hover:bg-emerald-400 active:scale-90";
+  if (hasPOS)
+    return "animate-pulse bg-emerald-500 border border-emerald-400/60 text-white shadow-[0_0_20px_rgba(52,211,153,0.45)] hover:bg-emerald-400 active:scale-90";
   return "bg-white/10 border border-white/20 text-white hover:bg-white/15 active:scale-90";
 }
 
@@ -110,6 +113,7 @@ export default function Mesas({
   const [qrCodes, setQrCodes] = useState<QRCodeRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [posTables, setPosTables] = useState<Set<number>>(new Set());
 
   const [selectedTable, setSelectedTable] = useState<TableRow | null>(null);
   const [activeSummary, setActiveSummary] = useState<TableActiveSummary | null>(
@@ -128,6 +132,7 @@ export default function Mesas({
       if (!branchId) return;
       if (showSpinner) setLoading(true);
       setError(null);
+      setPosTables(new Set());
       try {
         const token = await getToken();
         if (!token) return;
@@ -137,6 +142,25 @@ export default function Mesas({
         ]);
         setTables(t);
         setQrCodes(q);
+        // Pre-load POS status for all free tables in parallel (fire-and-forget)
+        const freeTables = t.filter(
+          (t) => !t.has_open_account && t.status !== "maintenance",
+        );
+        Promise.allSettled(
+          freeTables.map((ft) =>
+            peekTablePOS(branchId, ft.table_number, token).then((has) => ({
+              tableNumber: ft.table_number,
+              has,
+            })),
+          ),
+        ).then((results) => {
+          const posSet = new Set<number>();
+          for (const r of results) {
+            if (r.status === "fulfilled" && r.value.has)
+              posSet.add(r.value.tableNumber);
+          }
+          setPosTables(posSet);
+        });
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Error al cargar mesas");
       } finally {
@@ -174,6 +198,8 @@ export default function Mesas({
         );
         setActiveSummary(summary);
         setSelectedTable(table);
+      } else if (posTables.has(table.table_number)) {
+        setConfirmTable(table);
       } else {
         const hasPOS = await peekTablePOS(branchId, table.table_number, token);
         if (hasPOS) setConfirmTable(table);
@@ -190,11 +216,13 @@ export default function Mesas({
     try {
       const token = await getToken();
       if (!token) return;
+      console.log("[MESAS] openTableAccount →", confirmTable.table_number);
       const created = await openTableAccount(
         branchId,
         confirmTable.table_number,
         token,
       );
+      console.log("[MESAS] openTableAccount result:", created);
       if (created) {
         const summary = await getTableActiveSummary(
           branchId,
@@ -205,7 +233,8 @@ export default function Mesas({
         setSelectedTable(confirmTable);
         fetchData(false);
       }
-    } catch {
+    } catch (err) {
+      console.error("[MESAS] handleConfirmOpen error:", err);
     } finally {
       setConfirmTable(null);
       setOpeningAccount(false);
@@ -222,7 +251,10 @@ export default function Mesas({
       null)
     : null;
 
-  const openCount = tables.filter((t) => t.has_open_account).length;
+  const tapPayCount = tables.filter((t) => t.has_tap_pay_account).length;
+  const activeCount = tables.filter(
+    (t) => t.has_open_account && !t.has_tap_pay_account,
+  ).length;
   const availableCount = tables.filter(
     (t) => !t.has_open_account && t.status !== "maintenance",
   ).length;
@@ -296,10 +328,17 @@ export default function Mesas({
           </div>
         )}
         {tables.length > 0 && !loading && (
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 font-medium">
-              {openCount} {openCount === 1 ? "mesa activa" : "mesas activas"}
-            </span>
+          <div className="flex items-center gap-2 mt-2 flex-wrap justify-center">
+            {tapPayCount > 0 && (
+              <span className="text-xs px-2.5 py-1 rounded-full bg-white/15 border border-white/30 text-white font-medium">
+                {tapPayCount} en cobro
+              </span>
+            )}
+            {activeCount > 0 && (
+              <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 font-medium">
+                {activeCount} {activeCount === 1 ? "activa" : "activas"}
+              </span>
+            )}
             <span className="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-white/60 font-medium">
               {availableCount} {availableCount === 1 ? "libre" : "libres"}
             </span>
@@ -344,7 +383,7 @@ export default function Mesas({
                 key={table.id}
                 onClick={() => handleTableClick(table)}
                 disabled={table.status === "maintenance" || !!checkingTableId}
-                className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-150 disabled:cursor-default cursor-pointer ${circleClass(table)}`}
+                className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-150 disabled:cursor-default cursor-pointer ${circleClass(table, posTables.has(table.table_number))}`}
               >
                 {checkingTableId === table.id ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -374,7 +413,9 @@ export default function Mesas({
               <p className="text-white/40 text-xs uppercase tracking-widest mb-1">
                 Mesa {confirmTable.table_number}
               </p>
-              <h2 className="text-white font-bold text-xl">¿Abrir cuenta?</h2>
+              <h2 className="text-white font-bold text-xl">
+                ¿Liquidar cuenta?
+              </h2>
               <p className="text-white/50 text-sm mt-1">
                 Hay una orden activa en el POS para esta mesa.
               </p>
@@ -393,7 +434,7 @@ export default function Mesas({
                 className="flex-1 py-3 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-default cursor-pointer flex items-center justify-center gap-2"
               >
                 {openingAccount && <Loader2 className="w-4 h-4 animate-spin" />}
-                Abrir cuenta
+                Liquidar cuenta
               </button>
             </div>
           </div>
@@ -428,12 +469,6 @@ export default function Mesas({
                   <h2 className="text-white font-bold text-2xl leading-none">
                     {selectedTable.table_number}
                   </h2>
-                  {activeSummary?.folio != null &&
-                    activeSummary.folio !== "" && (
-                      <span className="text-sm font-mono font-semibold px-2 py-0.5 rounded-full bg-white/10 text-white/60">
-                        #{formatFolio(activeSummary.folio)}
-                      </span>
-                    )}
                 </div>
               </div>
               <button
@@ -506,11 +541,13 @@ export default function Mesas({
                         </span>
                         {dish.item}
                       </span>
-                      <span
-                        className={`text-xs shrink-0 font-medium ${dishColor(dish)}`}
-                      >
-                        {dishLabel(dish)}
-                      </span>
+                      {activeSummary?.service !== "tap_pay" && (
+                        <span
+                          className={`text-xs shrink-0 font-medium ${dishColor(dish)}`}
+                        >
+                          {dishLabel(dish)}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>

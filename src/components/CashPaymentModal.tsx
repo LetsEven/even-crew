@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
   X,
@@ -222,8 +223,16 @@ export default function CashPaymentModal({
       };
 
       if (isTapPay && payType === "select-items") {
-        for (const dishId of selectedDishes) {
-          await payTapPayDishOrder(dishId, cobradoPor.trim(), token);
+        const dishArray = Array.from(selectedDishes);
+        for (let i = 0; i < dishArray.length; i++) {
+          const isLast = i === dishArray.length - 1;
+          await payTapPayDishOrder(
+            dishArray[i],
+            cobradoPor.trim(),
+            token,
+            isLast ? tipAmount : 0,
+            method,
+          );
         }
       } else if (isTapPay) {
         await payTapPayOrderAmount(
@@ -231,6 +240,8 @@ export default function CashPaymentModal({
           baseAmount,
           cobradoPor.trim(),
           token,
+          tipAmount,
+          method,
         );
       } else if (payType === "select-items") {
         for (const dishId of selectedDishes) {
@@ -272,7 +283,7 @@ export default function CashPaymentModal({
   const cardClass = "rounded-2xl border border-white/8 px-4 py-4";
   const cardStyle = { background: "rgba(255,255,255,0.04)" };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
@@ -695,6 +706,7 @@ export default function CashPaymentModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -11,7 +11,7 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import OrderCarousel from "../components/OrderCarousel";
-import { deleteFcmToken } from "../services/api";
+import { deleteFcmToken, syncTapPayOrderFromPOS } from "../services/api";
 import type { Branch } from "../services/api";
 import type { DishStatus, CookingStatus, Order } from "../types";
 import { formatFolio } from "../utils/folio";
@@ -207,6 +207,21 @@ export default function Kitchen({
     };
   }, [fetchOrders]);
 
+  const handleActualizar = useCallback(async () => {
+    const tapPayOrders = orders.filter((o) => o.orderType === "tap_pay");
+    if (tapPayOrders.length > 0) {
+      const token = await getToken();
+      if (token) {
+        await Promise.allSettled(
+          tapPayOrders.map((o) =>
+            syncTapPayOrderFromPOS(o.id, token).catch(() => {}),
+          ),
+        );
+      }
+    }
+    fetchOrders(true);
+  }, [orders, getToken, fetchOrders]);
+
   return (
     <div
       className="relative min-h-screen flex flex-col"
@@ -340,7 +355,7 @@ export default function Kitchen({
 
         {/* Actualizar */}
         <button
-          onClick={() => fetchOrders(true)}
+          onClick={handleActualizar}
           disabled={loading}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors text-sm disabled:opacity-50 cursor-pointer"
         >

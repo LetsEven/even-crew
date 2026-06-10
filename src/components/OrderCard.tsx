@@ -1,10 +1,13 @@
 import { useState, Fragment } from "react";
-import { Banknote, Plus } from "lucide-react";
+import { Banknote, Loader2, Plus, Printer, QrCode } from "lucide-react";
+import { useAuth } from "@clerk/clerk-react";
 import type { Order, DishStatus, CookingStatus } from "../types";
-import type { Branch } from "../services/api";
+import type { Branch, QRCodeRow } from "../services/api";
+import { getQRCodesForBranch } from "../services/api";
 import DishItem from "./DishItem";
 import CashPaymentModal from "./CashPaymentModal";
 import AddDishModal from "./AddDishModal";
+import PrintTicketModal from "./PrintTicketModal";
 import { formatFolio } from "../utils/folio";
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
@@ -94,12 +97,40 @@ export default function OrderCard({
   const currentCookingStatus = order.cookingStatus ?? "preparing";
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showAddDish, setShowAddDish] = useState(false);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [ticketQR, setTicketQR] = useState<QRCodeRow | null>(null);
+  const [loadingTicket, setLoadingTicket] = useState(false);
+
+  const { getToken } = useAuth();
 
   const canAddDish = order.orderType === "flex_bill" && currentBranch != null;
   const canRegisterPayment =
     (order.orderType === "flex_bill" || order.orderType === "tap_pay") &&
     (order.remainingAmount ?? 0) > 0 &&
     currentBranch != null;
+  const canPrintTicket = order.orderType === "tap_pay" && currentBranch != null;
+  const tapPayMode = currentBranch?.tap_pay_mode ?? "scan_to_pay";
+
+  const handlePrint = async () => {
+    if (!currentBranch) return;
+    setLoadingTicket(true);
+    const tableNumber = parseInt(order.identifier.replace(/\D/g, ""), 10);
+    try {
+      const token = await getToken();
+      if (token) {
+        const qrCodes = await getQRCodesForBranch(currentBranch.id, token);
+        setTicketQR(
+          qrCodes.find((q) => q.table_number === tableNumber) ?? null,
+        );
+      } else {
+        setTicketQR(null);
+      }
+    } catch {
+      setTicketQR(null);
+    }
+    setLoadingTicket(false);
+    setPrintModalOpen(true);
+  };
 
   return (
     <div
@@ -139,11 +170,11 @@ export default function OrderCard({
           >
             {COOKING_STATUS_LABELS[currentCookingStatus]}
           </span>
-        ) : (
+        ) : order.orderType !== "tap_pay" ? (
           <p className="text-sm text-white/50 mt-0.5">
             {delivered}/{total} entregados
           </p>
-        )}
+        ) : null}
         {order.orderNotes && (
           <p className="text-sm text-white/80 mt-1.5">
             Comentarios: {order.orderNotes}
@@ -158,7 +189,7 @@ export default function OrderCard({
             key={dish.id}
             dish={dish}
             onStatusChange={onDishStatusChange}
-            hideStatusButtons={isPickAndGo}
+            hideStatusButtons={isPickAndGo || order.orderType === "tap_pay"}
           />
         ))}
       </div>
@@ -191,7 +222,8 @@ export default function OrderCard({
           order.paidAmount != null ||
           (order.payments?.length ?? 0) > 0 ||
           canRegisterPayment ||
-          canAddDish) && (
+          canAddDish ||
+          canPrintTicket) && (
           <div className="px-5 pb-5 pt-2 border-t border-white/10 flex flex-col gap-2">
             {(order.totalAmount != null || order.paidAmount != null) && (
               <div className="flex gap-3">
@@ -263,7 +295,7 @@ export default function OrderCard({
             {canAddDish && (
               <button
                 onClick={() => setShowAddDish(true)}
-                className="mt-1 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-teal-500/15 border border-teal-500/30 text-teal-400 text-sm font-medium hover:bg-teal-500/25 transition-colors active:scale-[0.98] cursor-pointer"
+                className="mt-1 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-white/10 text-white/80 text-sm font-medium hover:bg-white/15 transition-colors active:scale-[0.98] cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 Agregar platillo
@@ -272,10 +304,34 @@ export default function OrderCard({
             {canRegisterPayment && (
               <button
                 onClick={() => setShowPaymentModal(true)}
-                className="mt-1 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-sm font-medium hover:bg-emerald-500/25 transition-colors active:scale-[0.98] cursor-pointer"
+                className="mt-1 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors active:scale-[0.98] cursor-pointer"
               >
                 <Banknote className="w-4 h-4" />
                 Registrar pago
+              </button>
+            )}
+            {canPrintTicket && (
+              <button
+                onClick={handlePrint}
+                disabled={loadingTicket}
+                className="mt-1 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white/80 text-sm font-medium transition-colors active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+              >
+                {loadingTicket ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Cargando...
+                  </>
+                ) : tapPayMode === "tap_to_pay" ? (
+                  <>
+                    <QrCode className="w-4 h-4" />
+                    Mostrar QR
+                  </>
+                ) : (
+                  <>
+                    <Printer className="w-4 h-4" />
+                    Imprimir ticket
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -301,6 +357,15 @@ export default function OrderCard({
             setShowAddDish(false);
             onPaymentRegistered?.();
           }}
+        />
+      )}
+      {printModalOpen && currentBranch && (
+        <PrintTicketModal
+          order={order}
+          qrCode={ticketQR}
+          branchId={currentBranch.id}
+          mode={tapPayMode}
+          onClose={() => setPrintModalOpen(false)}
         />
       )}
     </div>

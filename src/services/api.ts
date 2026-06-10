@@ -101,6 +101,7 @@ export interface Branch {
   branch_number: number;
   restaurant_id: number;
   max_pending_orders?: number | null;
+  tap_pay_mode?: "scan_to_pay" | "tap_to_pay";
 }
 
 export async function getBranches(token: string): Promise<Branch[]> {
@@ -222,14 +223,29 @@ export async function payDishOrderManual(
   });
 }
 
+export async function syncTapPayOrderFromPOS(
+  orderId: string,
+  token: string,
+): Promise<void> {
+  await authFetch(`/api/tap-pay/orders/${orderId}/sync-from-pos`, token, {
+    method: "POST",
+  });
+}
+
 export async function payTapPayDishOrder(
   dishId: string,
   guestName: string,
   token: string,
+  tipAmount?: number,
+  paymentSource?: string,
 ): Promise<void> {
   await authFetch(`/api/tap-pay/dishes/${dishId}/pay`, token, {
     method: "POST",
-    body: JSON.stringify({ guestName }),
+    body: JSON.stringify({
+      guestName,
+      tipAmount: tipAmount ?? 0,
+      paymentSource: paymentSource ?? null,
+    }),
   });
 }
 
@@ -238,10 +254,17 @@ export async function payTapPayOrderAmount(
   amount: number,
   guestName: string,
   token: string,
+  tipAmount?: number,
+  paymentSource?: string,
 ): Promise<void> {
   await authFetch(`/api/tap-pay/orders/${orderId}/pay-amount`, token, {
     method: "POST",
-    body: JSON.stringify({ amount, guestName }),
+    body: JSON.stringify({
+      amount,
+      guestName,
+      tipAmount: tipAmount ?? 0,
+      paymentSource: paymentSource ?? null,
+    }),
   });
 }
 
@@ -273,6 +296,7 @@ export interface TableRow {
   table_number: number;
   status: "available" | "occupied" | "maintenance";
   has_open_account: boolean;
+  has_tap_pay_account?: boolean;
 }
 
 export interface QRCodeRow {

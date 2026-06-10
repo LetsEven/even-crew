@@ -120,6 +120,103 @@ function buildTicket(
   return buf;
 }
 
+function buildPriceTicket(
+  dishes: { item: string; quantity: number; price?: number }[],
+  identifier: string,
+  qrUrl: string | null,
+): number[] {
+  const WIDTH = 32;
+  const buf: number[] = [];
+  const now = new Date();
+  const fecha = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
+  const num = identifier.match(/\d+/)?.[0];
+  const mesaLabel = num
+    ? `MESA ${String(num).padStart(2, "0")}`
+    : identifier.toUpperCase();
+
+  buf.push(0x1b, 0x40); // Init
+  buf.push(0x1b, 0x61, 0x01); // Center
+  buf.push(0x1b, 0x21, 0x30); // Double size
+  buf.push(...encodeText(`${mesaLabel}\n`));
+  buf.push(0x1b, 0x21, 0x00); // Normal
+  buf.push(...encodeText(`${fecha}\n`));
+  buf.push(0x1b, 0x61, 0x00); // Left
+  buf.push(...encodeText("================================\n"));
+
+  const total = dishes.reduce((sum, d) => sum + (d.price ?? 0) * d.quantity, 0);
+
+  for (const dish of dishes) {
+    const linePrice = (dish.price ?? 0) * dish.quantity;
+    const priceStr = `$${linePrice.toFixed(2)}`;
+    const prefix = dish.quantity > 1 ? `${dish.quantity}x ` : "";
+    const nameRaw = `${prefix}${dish.item.toUpperCase()}`;
+    const maxName = WIDTH - priceStr.length - 1;
+    const name = nameRaw.length > maxName ? nameRaw.slice(0, maxName) : nameRaw;
+    const line = `${name}${" ".repeat(WIDTH - name.length - priceStr.length)}${priceStr}\n`;
+    buf.push(...encodeText(line));
+  }
+
+  buf.push(...encodeText("================================\n"));
+  buf.push(0x1b, 0x45, 0x01); // Bold on
+  const totalStr = `$${total.toFixed(2)}`;
+  const totalLabel = "TOTAL:";
+  buf.push(
+    ...encodeText(
+      `${totalLabel}${" ".repeat(WIDTH - totalLabel.length - totalStr.length)}${totalStr}\n`,
+    ),
+  );
+  buf.push(0x1b, 0x45, 0x00); // Bold off
+
+  if (qrUrl) {
+    buf.push(0x1b, 0x61, 0x01); // Center
+    buf.push(0x0a); // blank line
+
+    const urlBytes = qrUrl.split("").map((c) => c.charCodeAt(0) & 0xff);
+    const dataLen = urlBytes.length + 3;
+    const pL = dataLen & 0xff;
+    const pH = (dataLen >> 8) & 0xff;
+
+    buf.push(0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00); // Model 2
+    buf.push(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 0x06); // Module size 6
+    buf.push(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x33); // Error correction H
+    buf.push(0x1d, 0x28, 0x6b, pL, pH, 0x31, 0x50, 0x30, ...urlBytes); // Store data
+    buf.push(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30); // Print QR
+
+    buf.push(...encodeText("\nEscanea para pagar\n"));
+  }
+
+  buf.push(0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x00); // Feed + cut
+  return buf;
+}
+
+export async function printTapPayTicket(
+  branchId: string,
+  dishes: { item: string; quantity: number; price?: number }[],
+  identifier: string,
+  qrUrl: string | null,
+): Promise<void> {
+  const allPrinters = await getPrinters(branchId);
+  const active = allPrinters.filter((p) => p.is_active !== false && p.role);
+  if (active.length === 0) throw new Error("No hay impresoras configuradas");
+
+  const ticket = buildPriceTicket(dishes, identifier, qrUrl);
+
+  for (const printer of active) {
+    if (printer.connection_type === "usb" && printer.usb_device_name) {
+      await invoke("print_raw_usb", {
+        printerName: printer.usb_device_name,
+        data: ticket,
+      }).catch((e) => console.error("[PRINT] Error USB:", e));
+    } else if (printer.ip && printer.port) {
+      await invoke("print_raw", {
+        ip: printer.ip,
+        port: printer.port,
+        data: ticket,
+      }).catch((e) => console.error("[PRINT] Error WiFi:", e));
+    }
+  }
+}
+
 export function usePrinting() {
   const printersRef = useRef<PrinterRecord[]>([]);
   const branchIdRef = useRef<string | null>(null);
