@@ -33,12 +33,33 @@ export async function getActiveOrders(
 export async function getOrderHistory(
   token: string,
   branchId?: string | null,
+  since?: string | null,
+  until?: string | null,
 ): Promise<Order[]> {
-  const url = branchId
-    ? `/api/kitchen/orders/history?branchId=${branchId}`
-    : "/api/kitchen/orders/history";
-  const data = await authFetch(url, token);
+  const params = new URLSearchParams();
+  if (branchId) params.set("branchId", branchId);
+  if (since) params.set("since", since);
+  if (until) params.set("until", until);
+  const qs = params.toString();
+  const data = await authFetch(
+    `/api/kitchen/orders/history${qs ? `?${qs}` : ""}`,
+    token,
+  );
   return data.orders ?? [];
+}
+
+export async function getAvailableMonths(
+  token: string,
+  branchId?: string | null,
+): Promise<string[]> {
+  const params = new URLSearchParams();
+  if (branchId) params.set("branchId", branchId);
+  const qs = params.toString();
+  const data = await authFetch(
+    `/api/kitchen/orders/history/available-months${qs ? `?${qs}` : ""}`,
+    token,
+  );
+  return data.months ?? [];
 }
 
 export async function updateDishStatus(

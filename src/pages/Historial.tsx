@@ -8,7 +8,7 @@ import {
   CheckCircle2,
   Clock,
 } from "lucide-react";
-import { getOrderHistory } from "../services/api";
+import { getOrderHistory, getAvailableMonths } from "../services/api";
 import type { Branch } from "../services/api";
 import type { Order, OrderType } from "../types";
 import { formatFolio } from "../utils/folio";
@@ -29,6 +29,55 @@ const ORDER_TYPE_COLORS: Record<OrderType, string> = {
   flex_bill: "bg-purple-500/20 text-purple-300",
 };
 
+const MONTH_NAMES_ES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
+
+function monthLabel(ym: string) {
+  const [year, month] = ym.split("-");
+  return `${MONTH_NAMES_ES[parseInt(month) - 1]} ${year}`;
+}
+
+type Filter = "today" | "last7" | "last30" | string;
+
+function getDateRange(filter: Filter): { since: string; until: string } {
+  const now = new Date();
+  if (filter === "today") {
+    const since = new Date(now);
+    since.setHours(0, 0, 0, 0);
+    const until = new Date(now);
+    until.setHours(23, 59, 59, 999);
+    return { since: since.toISOString(), until: until.toISOString() };
+  }
+  if (filter === "last7") {
+    const since = new Date(now);
+    since.setDate(since.getDate() - 7);
+    since.setHours(0, 0, 0, 0);
+    return { since: since.toISOString(), until: now.toISOString() };
+  }
+  if (filter === "last30") {
+    const since = new Date(now);
+    since.setDate(since.getDate() - 30);
+    since.setHours(0, 0, 0, 0);
+    return { since: since.toISOString(), until: now.toISOString() };
+  }
+  // month: "2026-05"
+  const [year, month] = filter.split("-").map(Number);
+  const since = new Date(year, month - 1, 1, 0, 0, 0, 0);
+  const until = new Date(year, month, 0, 23, 59, 59, 999);
+  return { since: since.toISOString(), until: until.toISOString() };
+}
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("es-MX", {
@@ -61,18 +110,21 @@ export default function Historial({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [branchOpen, setBranchOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<Filter>("today");
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const branchRef = useRef<HTMLDivElement>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
 
   const fetchHistory = useCallback(
-    async (showSpinner = true) => {
+    async (showSpinner = true, filter: Filter = selectedFilter) => {
       if (showSpinner) setLoading(true);
       setError(null);
       try {
         const token = await getToken();
         if (!token) return;
-        const data = await getOrderHistory(token, branchId);
+        const { since, until } = getDateRange(filter);
+        const data = await getOrderHistory(token, branchId, since, until);
         setOrders(data);
       } catch (e: any) {
         setError(e.message ?? "Error al cargar historial");
@@ -80,22 +132,29 @@ export default function Historial({
         setLoading(false);
       }
     },
-    [getToken, branchId],
+    [getToken, branchId, selectedFilter],
   );
+
+  const fetchAvailableMonths = useCallback(async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const months = await getAvailableMonths(token, branchId);
+      setAvailableMonths(months);
+    } catch {
+      setAvailableMonths([]);
+    }
+  }, [getToken, branchId]);
+
+  useEffect(() => {
+    if (branchId) {
+      fetchAvailableMonths();
+    }
+  }, [fetchAvailableMonths, branchId]);
 
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    if (menuOpen) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -107,6 +166,35 @@ export default function Historial({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [branchOpen]);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterOpen(false);
+      }
+    };
+    if (filterOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [filterOpen]);
+
+  const handleFilterChange = (f: Filter) => {
+    setSelectedFilter(f);
+    fetchHistory(true, f);
+  };
+
+  const FIXED_FILTERS: { id: Filter; label: string }[] = [
+    { id: "today", label: "Hoy" },
+    { id: "last7", label: "7 días" },
+    { id: "last30", label: "30 días" },
+  ];
+
+  const allFilters = [
+    ...FIXED_FILTERS,
+    ...availableMonths.map((ym) => ({ id: ym, label: monthLabel(ym) })),
+  ];
+
+  const selectedLabel =
+    allFilters.find((f) => f.id === selectedFilter)?.label ?? "Hoy";
+
   return (
     <div
       className="relative min-h-screen flex flex-col"
@@ -116,7 +204,6 @@ export default function Historial({
     >
       {/* Header */}
       <header className="px-5 pt-5 pb-2 flex items-center justify-between relative">
-        {/* Botón volver */}
         <button
           onClick={onBack}
           className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
@@ -124,14 +211,12 @@ export default function Historial({
           <ChevronLeft className="w-5 h-5" />
         </button>
 
-        {/* Logo centrado */}
         <img
           src="/logo-short-green.webp"
           className="absolute left-1/2 -translate-x-1/2 w-8 h-8"
           alt="Even"
         />
 
-        {/* Refresh + menú */}
         <div className="flex items-center gap-1">
           <button
             onClick={() => fetchHistory(true)}
@@ -145,7 +230,7 @@ export default function Historial({
       </header>
 
       {/* Título y selector de sucursal */}
-      <div className="flex flex-col items-center pb-4 gap-1">
+      <div className="flex flex-col items-center pb-3 gap-1">
         <h1 className="text-white font-semibold text-xl">Historial</h1>
         {!branchesLoading && branches.length > 0 && (
           <div className="relative" ref={branchRef}>
@@ -185,8 +270,46 @@ export default function Historial({
             )}
           </div>
         )}
-        {!loading && !error && (
-          <p className="text-white/50 text-sm">{orders.length} orden(es)</p>
+
+        {/* Filter dropdown */}
+        {branchId && (
+          <div className="relative pt-2" ref={filterRef}>
+            <button
+              onClick={() => setFilterOpen((v) => !v)}
+              className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/80 text-sm rounded-full px-4 py-1.5 border border-white/10 transition-colors cursor-pointer"
+            >
+              <span>{selectedLabel}</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-white/40 transition-transform ${filterOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+            {filterOpen && (
+              <ul className="absolute z-50 top-full mt-1 left-1/2 -translate-x-1/2 min-w-full w-max bg-[#0a3238] border border-white/10 rounded-2xl overflow-hidden shadow-xl max-h-64 overflow-y-auto">
+                {allFilters.map((f) => (
+                  <li key={f.id}>
+                    <button
+                      onClick={() => {
+                        handleFilterChange(f.id);
+                        setFilterOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between gap-4 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      <span>{f.label}</span>
+                      {f.id === selectedFilter && (
+                        <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {!loading && !error && branchId && (
+          <p className="text-white/50 text-sm pt-1">
+            {orders.length} orden(es)
+          </p>
         )}
       </div>
 
@@ -227,7 +350,7 @@ export default function Historial({
         ) : orders.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
             <p className="text-white/50 text-sm">
-              No hay órdenes en los últimos 30 días
+              No hay órdenes en este período
             </p>
           </div>
         ) : (
@@ -242,7 +365,6 @@ export default function Historial({
                   key={order.id}
                   className="bg-white/5 border border-white/8 rounded-2xl p-4 space-y-3"
                 >
-                  {/* Cabecera de la orden */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
@@ -269,7 +391,6 @@ export default function Historial({
                     </div>
                   </div>
 
-                  {/* Meta: fecha y folio */}
                   <div className="flex items-center gap-3 text-xs text-white/40">
                     <span>{formatDateTime(order.createdAt)}</span>
                     {order.folio != null && (
@@ -279,7 +400,6 @@ export default function Historial({
                     )}
                   </div>
 
-                  {/* Lista de platillos */}
                   <div className="space-y-1.5">
                     {order.dishes.map((dish) => (
                       <div
@@ -306,7 +426,6 @@ export default function Historial({
                     ))}
                   </div>
 
-                  {/* Totales para flex_bill */}
                   {order.orderType === "flex_bill" &&
                     order.totalAmount != null && (
                       <div className="flex items-center gap-4 pt-2 border-t border-white/8 text-xs">
