@@ -47,30 +47,28 @@ function encodeText(text: string): number[] {
   return bytes;
 }
 
-let cachedLogoBytes: number[] | null = null;
+const asteriskCache = new Map<number, number[]>();
 
-async function getLogoBytes(): Promise<number[]> {
-  if (cachedLogoBytes !== null) return cachedLogoBytes;
+async function getAsteriskBytes(targetWidth = 44): Promise<number[]> {
+  if (asteriskCache.has(targetWidth)) return asteriskCache.get(targetWidth)!;
   try {
     const img = new Image();
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
       img.onerror = () => reject();
-      img.src = "/logo-even-print.png";
+      img.src = "/asterisk-black-print.png";
     });
+    const TARGET_W = targetWidth;
+    const w = TARGET_W;
+    const h = Math.round(TARGET_W * (img.naturalHeight / img.naturalWidth));
     const canvas = document.createElement("canvas");
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext("2d")!;
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-    const { data, width, height } = ctx.getImageData(
-      0,
-      0,
-      canvas.width,
-      canvas.height,
-    );
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    const { data, width, height } = ctx.getImageData(0, 0, w, h);
     const bytesPerRow = Math.ceil(width / 8);
     const bitmap: number[] = [];
     for (let y = 0; y < height; y++) {
@@ -92,10 +90,11 @@ async function getLogoBytes(): Promise<number[]> {
     const xH = (bytesPerRow >> 8) & 0xff;
     const yL = height & 0xff;
     const yH = (height >> 8) & 0xff;
-    cachedLogoBytes = [0x1d, 0x76, 0x30, 0x00, xL, xH, yL, yH, ...bitmap];
-    return cachedLogoBytes;
+    const bytes = [0x1d, 0x76, 0x30, 0x00, xL, xH, yL, yH, ...bitmap];
+    asteriskCache.set(targetWidth, bytes);
+    return bytes;
   } catch {
-    cachedLogoBytes = [];
+    asteriskCache.set(targetWidth, []);
     return [];
   }
 }
@@ -109,12 +108,12 @@ type TicketItem = {
   special_instructions?: string | null;
 };
 
-function buildTicket(
+async function buildTicket(
   items: TicketItem[],
   identifier: string,
   folio: string | number,
   orderedBy?: string | null,
-): number[] {
+): Promise<number[]> {
   const buf: number[] = [];
   const now = new Date();
   const fecha =
@@ -134,7 +133,7 @@ function buildTicket(
     buf.push(...encodeText(`${orderedBy.toUpperCase()}\n`));
   }
   buf.push(0x1b, 0x61, 0x00); // Align left
-  buf.push(0x1b, 0x21, 0x00); // Normal size
+  buf.push(0x1d, 0x21, 0x01); // Height x2, width x1 (taller but not wider)
   let mesaLine: string;
   if (/habitaci/i.test(identifier) || /cuarto/i.test(identifier)) {
     mesaLine = `HABITACION: ${num || identifier} MESERO: EVEN\n\n`;
@@ -143,7 +142,7 @@ function buildTicket(
   } else {
     mesaLine = `MESA: ${num ? String(num).padStart(2, "0") : identifier} MESERO: EVEN\n\n`;
   }
-  buf.push(...encodeText(`\nNÚMERO DE ORDEN: ${ordenLabel}\n`));
+  buf.push(...encodeText(`\nNUMERO DE ORDEN: ${ordenLabel}\n`));
   buf.push(...encodeText(`${fecha}\n`));
   buf.push(...encodeText(mesaLine));
   buf.push(...encodeText("========================\n"));
@@ -160,7 +159,15 @@ function buildTicket(
     }
   }
   buf.push(...encodeText("========================\n"));
-  buf.push(0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x00); // Feed + cut
+
+  buf.push(0x1d, 0x21, 0x00); // Reset size
+  buf.push(0x1b, 0x61, 0x01); // Center
+  const asteriskBytes = await getAsteriskBytes();
+  if (asteriskBytes.length > 0) {
+    buf.push(0x0a);
+    buf.push(...asteriskBytes);
+  }
+  buf.push(0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x00); // Feed + cut
 
   return buf;
 }
@@ -174,6 +181,7 @@ async function buildPriceTicket(
   const buf: number[] = [];
   const now = new Date();
   const fecha = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
+  const hora = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   const num = identifier.match(/\d+/)?.[0];
   const mesaLabel = num
     ? `MESA ${String(num).padStart(2, "0")}`
@@ -182,16 +190,11 @@ async function buildPriceTicket(
   buf.push(0x1b, 0x40); // Init
   buf.push(0x1b, 0x61, 0x01); // Center
 
-  const logoBytes = await getLogoBytes();
-  if (logoBytes.length > 0) {
-    buf.push(...logoBytes);
-    buf.push(0x0a); // blank line after logo
-  }
-
   buf.push(0x1b, 0x21, 0x30); // Double size
   buf.push(...encodeText(`${mesaLabel}\n`));
   buf.push(0x1b, 0x21, 0x00); // Normal
   buf.push(...encodeText(`${fecha}\n`));
+  buf.push(...encodeText(`${hora}\n`));
   buf.push(0x1b, 0x61, 0x00); // Left
   buf.push(...encodeText("================================\n"));
 
@@ -237,7 +240,13 @@ async function buildPriceTicket(
     buf.push(...encodeText("\nEscanea para pagar\n"));
   }
 
-  buf.push(0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x00); // Feed + cut
+  buf.push(0x1b, 0x61, 0x01); // Center
+  const asteriskBytes = await getAsteriskBytes(56);
+  if (asteriskBytes.length > 0) {
+    buf.push(0x0a);
+    buf.push(...asteriskBytes);
+  }
+  buf.push(0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x00); // Feed + cut
   return buf;
 }
 
@@ -332,7 +341,7 @@ export function usePrinting() {
       );
       if (printerItems.length === 0) continue;
 
-      const ticket = buildTicket(
+      const ticket = await buildTicket(
         printerItems,
         data.orderInfo.identifier,
         data.orderInfo.folio ?? "",

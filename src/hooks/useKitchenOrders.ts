@@ -176,13 +176,17 @@ export function useKitchenOrders(branchId: string | null) {
           }))
           .filter((order) => {
             if (order.dishes.some((d) => d.status !== "delivered")) return true;
-            // flex_bill: conservar mientras la mesa no se haya pagado
+            // flex_bill: conservar mientras haya saldo pendiente
             if (
               order.orderType === "flex_bill" &&
               (order.remainingAmount ?? 0) > 0 &&
               order.status !== "paid"
             ) {
               return true;
+            }
+            // tap_pay: conservar hasta que esté pagada
+            if (order.orderType === "tap_pay") {
+              return order.status !== "paid";
             }
             return false;
           }),

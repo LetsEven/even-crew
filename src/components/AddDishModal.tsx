@@ -664,9 +664,8 @@ export default function AddDishModal({
                     ${totalPrice.toFixed(2)}
                   </p>
                 </div>
-                <p className="text-xs text-white/40 leading-relaxed">
-                  {quantity > 1 ? `${quantity}× · ` : ""}
-                  {Object.entries(customSelections)
+                {(() => {
+                  const customText = Object.entries(customSelections)
                     .flatMap(([fieldId, sel]) => {
                       const field = selectedItem.custom_fields?.find(
                         (f) => f.id === fieldId,
@@ -694,8 +693,15 @@ export default function AddDishModal({
                       }
                       return [];
                     })
-                    .join(", ") || "Sin personalización"}
-                </p>
+                    .join(", ");
+                  const prefix = quantity > 1 ? `${quantity}× · ` : "";
+                  const line = prefix + customText;
+                  return line ? (
+                    <p className="text-xs text-white/40 leading-relaxed">
+                      {line}
+                    </p>
+                  ) : null;
+                })()}
                 {specialInstructions && (
                   <p className="text-xs text-white/30 italic mt-1">
                     "{specialInstructions}"
