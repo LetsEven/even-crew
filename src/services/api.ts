@@ -122,7 +122,7 @@ export interface Branch {
   branch_number: number;
   restaurant_id: number;
   max_pending_orders?: number | null;
-  tap_pay_mode?: "scan_to_pay" | "tap_to_pay";
+  tap_pay_print?: boolean;
 }
 
 export async function getBranches(token: string): Promise<Branch[]> {

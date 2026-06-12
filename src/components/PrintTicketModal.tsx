@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Copy, Check } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { printTapPayTicket } from "../hooks/usePrinting";
 import type { Order } from "../types";
@@ -10,7 +10,6 @@ interface Props {
   order: Order;
   qrCode: QRCodeRow | null;
   branchId: string;
-  mode?: "scan_to_pay" | "tap_to_pay";
   onClose: () => void;
 }
 
@@ -18,12 +17,10 @@ export default function PrintTicketModal({
   order,
   qrCode,
   branchId,
-  mode = "scan_to_pay",
   onClose,
 }: Props) {
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const tableNumber = parseInt(order.identifier.replace(/\D/g, ""), 10) || null;
   const dishTotal = order.dishes.reduce(
@@ -42,17 +39,6 @@ export default function PrintTicketModal({
       setPrintError(e?.message || "Error al imprimir");
     } finally {
       setPrinting(false);
-    }
-  };
-
-  const handleCopy = async () => {
-    if (!qrUrl) return;
-    try {
-      await navigator.clipboard.writeText(qrUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // ignore
     }
   };
 
@@ -104,22 +90,11 @@ export default function PrintTicketModal({
           {qrUrl ? (
             <>
               <div className="bg-white p-3 rounded-2xl shadow-lg">
-                <QRCodeSVG
-                  value={qrUrl}
-                  size={mode === "tap_to_pay" ? 210 : 150}
-                  level="H"
-                  marginSize={0}
-                />
+                <QRCodeSVG value={qrUrl} size={150} level="H" marginSize={0} />
               </div>
-              {mode === "tap_to_pay" ? (
-                <p className="text-xs text-white/50 text-center break-all px-2">
-                  {qrUrl}
-                </p>
-              ) : (
-                <p className="text-xs text-white/40 text-center">
-                  Escanea para pagar
-                </p>
-              )}
+              <p className="text-xs text-white/40 text-center">
+                Escanea para pagar
+              </p>
             </>
           ) : (
             <p className="text-sm text-white/30 text-center py-4">
@@ -143,40 +118,20 @@ export default function PrintTicketModal({
           >
             Cerrar
           </button>
-          {mode === "tap_to_pay" ? (
-            <button
-              onClick={handleCopy}
-              disabled={!qrUrl}
-              className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  Copiado
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  Copiar link
-                </>
-              )}
-            </button>
-          ) : (
-            <button
-              onClick={handlePrint}
-              disabled={printing}
-              className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors cursor-pointer disabled:opacity-70 flex items-center justify-center gap-2"
-            >
-              {printing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Imprimiendo...
-                </>
-              ) : (
-                "Imprimir"
-              )}
-            </button>
-          )}
+          <button
+            onClick={handlePrint}
+            disabled={printing}
+            className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors cursor-pointer disabled:opacity-70 flex items-center justify-center gap-2"
+          >
+            {printing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Imprimiendo...
+              </>
+            ) : (
+              "Imprimir"
+            )}
+          </button>
         </div>
       </div>
     </div>,

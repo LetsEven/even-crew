@@ -1,5 +1,5 @@
 import { useState, Fragment } from "react";
-import { Banknote, Loader2, Plus, Printer, QrCode } from "lucide-react";
+import { Banknote, Loader2, Plus, Printer } from "lucide-react";
 import { useAuth } from "@clerk/clerk-react";
 import type { Order, DishStatus, CookingStatus } from "../types";
 import type { Branch, QRCodeRow } from "../services/api";
@@ -108,8 +108,10 @@ export default function OrderCard({
     (order.orderType === "flex_bill" || order.orderType === "tap_pay") &&
     (order.remainingAmount ?? 0) > 0 &&
     currentBranch != null;
-  const canPrintTicket = order.orderType === "tap_pay" && currentBranch != null;
-  const tapPayMode = currentBranch?.tap_pay_mode ?? "scan_to_pay";
+  const canPrintTicket =
+    order.orderType === "tap_pay" &&
+    currentBranch != null &&
+    (currentBranch.tap_pay_print ?? true);
 
   const handlePrint = async () => {
     if (!currentBranch) return;
@@ -321,11 +323,6 @@ export default function OrderCard({
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Cargando...
                   </>
-                ) : tapPayMode === "tap_to_pay" ? (
-                  <>
-                    <QrCode className="w-4 h-4" />
-                    Mostrar QR
-                  </>
                 ) : (
                   <>
                     <Printer className="w-4 h-4" />
@@ -364,7 +361,6 @@ export default function OrderCard({
           order={order}
           qrCode={ticketQR}
           branchId={currentBranch.id}
-          mode={tapPayMode}
           onClose={() => setPrintModalOpen(false)}
         />
       )}
